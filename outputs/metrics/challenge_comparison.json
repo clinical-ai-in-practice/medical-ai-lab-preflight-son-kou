@@ -1,0 +1,31 @@
+{
+  "baseline_dice": 0.1238,
+  "new_dice": 0.1258,
+  "delta": 0.0021,
+  "change_description": "Replaced the fixed intensity threshold with per-slice Otsu adaptive thresholding, combined with the largest-CC post-processing step from Day 1.",
+  "fixed_threshold": 0.5,
+  "otsu_thresholds_per_slice": [
+    0.5061,
+    0.506,
+    0.4902,
+    0.4981,
+    0.5059,
+    0.5059,
+    0.502,
+    0.506,
+    0.4942,
+    0.5061,
+    0.5102,
+    0.502,
+    0.5059,
+    0.502,
+    0.5059,
+    0.5215,
+    0.5099,
+    0.4981,
+    0.5139,
+    0.5059
+  ],
+  "n_slices": 20,
+  "representative_slice_idx": 16
+}

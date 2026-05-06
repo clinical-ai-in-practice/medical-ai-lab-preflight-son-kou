@@ -1,0 +1,12 @@
+{
+  "status": "ok",
+  "dataset": "BraTS_teaching_pack",
+  "source": "local",
+  "n_slices": 20,
+  "modality": "FLAIR",
+  "npz_keys": [
+    "images",
+    "masks"
+  ],
+  "pack_path": "data/sample/imaging"
+}

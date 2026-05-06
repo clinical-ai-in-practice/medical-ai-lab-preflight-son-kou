@@ -1,0 +1,21 @@
+# teaching_pack.cfg.example
+#
+# Copy or rename this file to data/teaching_pack.cfg and fill in ONE option.
+#
+# ── URL download (most common for GitHub Classroom) ────────────────────────
+url = https://your-instructor-server.example.com/teaching_pack.zip
+
+# ── Local directory (pack already on disk) ─────────────────────────────────
+# path = /shared/course/teaching_pack/
+
+# ── Local zip file ──────────────────────────────────────────────────────────
+# path = /shared/course/teaching_pack.zip
+#
+# ── Notes ──────────────────────────────────────────────────────────────────
+# Only one of url= or path= should be active at a time.
+# Environment variables TEACHING_PACK_URL and TEACHING_PACK_PATH override
+# this file if set.
+#
+# The teaching pack must contain:
+#   slices.npz         — imaging slices array (see slices_meta.json for keys)
+#   slices_meta.json   — metadata: dataset, n_slices, modality, source_info

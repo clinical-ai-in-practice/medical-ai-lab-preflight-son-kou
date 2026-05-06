@@ -1,0 +1,52 @@
+{
+  "required_outputs": [
+    "outputs/status",
+    "outputs/figures",
+    "outputs/metrics",
+    "reports"
+  ],
+  "required_status_files": [
+    "outputs/status/stage_00_bootstrap.json",
+    "outputs/status/stage_01_fetch_sample.json",
+    "outputs/status/stage_02_load_visualize.json",
+    "outputs/status/stage_03_train_baseline.json",
+    "outputs/status/stage_04_error_analysis.json",
+    "outputs/status/stage_05_model_swap.json",
+    "outputs/status/stage_06_pack_report.json"
+  ],
+  "required_status_files_day2": [
+    "outputs/status/stage_07_challenge_plan.json",
+    "outputs/status/stage_08_adapt_pipeline.json",
+    "outputs/status/stage_09_translation_memo.json"
+  ],
+  "required_figures": [
+    "outputs/figures/sample_overlay.png",
+    "outputs/figures/loss_curve.png"
+  ],
+  "required_metrics": [
+    "outputs/metrics/val_metrics.json",
+    "outputs/metrics/model_swap_comparison.json"
+  ],
+  "required_reports": [
+    "reports/env_check.md",
+    "reports/data_notes.md",
+    "reports/train_notes.md",
+    "reports/error_analysis.md",
+    "reports/model_swap.md",
+    "reports/day1_summary.md"
+  ],
+  "required_reports_day2": [
+    "reports/challenge_plan.md",
+    "reports/translation_memo.md"
+  ],
+  "metrics_schema": {
+    "val_metrics.json": {
+      "dice": "float in [0.0, 1.0]"
+    },
+    "model_swap_comparison.json": {
+      "baseline_dice": "float",
+      "new_dice": "float or null",
+      "change_description": "string"
+    }
+  }
+}

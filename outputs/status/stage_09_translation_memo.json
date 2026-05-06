@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "dataset": "BraTS_teaching_pack",
+  "modality": "FLAIR",
+  "n_slices": 20,
+  "best_dice": 0.1258,
+  "best_method": "Otsu adaptive thresholding + largest-CC post-processing"
+}

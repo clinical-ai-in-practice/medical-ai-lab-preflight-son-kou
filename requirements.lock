@@ -1,0 +1,11 @@
+# Pinned dependencies — generated from requirements.txt
+# Install with: pip install -r requirements.txt
+numpy==1.26.4
+matplotlib==3.9.2
+pandas==2.2.2
+Pillow==10.4.0
+scikit-learn==1.5.1
+scikit-image==0.24.0
+nibabel==5.2.1
+streamlit==1.38.0
+pytest==8.3.2

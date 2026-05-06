@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "changes_summary": "Replaced the fixed intensity threshold with per-slice Otsu adaptive thresholding, combined with the largest-CC post-processing step from Day 1.",
+  "baseline_dice": 0.1238,
+  "new_dice": 0.1258,
+  "delta": 0.0021,
+  "n_slices": 20
+}

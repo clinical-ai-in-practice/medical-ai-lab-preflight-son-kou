@@ -1,0 +1,39 @@
+name: hidden-evaluation
+
+# Placeholder for instructor-run hidden evaluation.
+#
+# This workflow is triggered manually (workflow_dispatch) by the instructor
+# after the submission deadline.  It is NOT run on student pushes.
+#
+# To implement hidden evaluation:
+# 1. Add the hidden test suite to a private repository or as a secret artifact.
+# 2. Fetch it here and run it against the student submission.
+# 3. Post results to a grade book or collect them via Actions artifacts.
+#
+# Until that is implemented, this workflow is intentionally a no-op.
+# Do not remove it — it reserves the slot for future use.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hidden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Confirm visible tests pass
+        run: pytest -q tests/
+
+      # TODO: add hidden evaluation steps here
+      - name: Hidden evaluation placeholder
+        run: echo "Hidden evaluation not yet configured. See workflow comments."

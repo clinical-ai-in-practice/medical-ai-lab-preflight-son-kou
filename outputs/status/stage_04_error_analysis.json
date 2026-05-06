@@ -1,0 +1,19 @@
+{
+  "status": "ok",
+  "threshold": 0.5,
+  "n_slices": 20,
+  "best_case": {
+    "slice_idx": 15,
+    "dice": 0.257,
+    "true_positives": 333,
+    "false_positives": 1885,
+    "false_negatives": 40
+  },
+  "worst_case": {
+    "slice_idx": 8,
+    "dice": 0.0339,
+    "true_positives": 36,
+    "false_positives": 2022,
+    "false_negatives": 33
+  }
+}

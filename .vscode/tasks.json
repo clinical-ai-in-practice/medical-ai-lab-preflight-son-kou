@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "00 bootstrap",        "type": "shell", "command": "make bootstrap",        "group": "build"},
+    {"label": "01 fetch-sample",     "type": "shell", "command": "make fetch-sample",     "group": "build"},
+    {"label": "02 visualize",        "type": "shell", "command": "make visualize",        "group": "build"},
+    {"label": "03 smoke-train",      "type": "shell", "command": "make smoke-train",      "group": "build"},
+    {"label": "04 error-analysis",   "type": "shell", "command": "make error-analysis",   "group": "build"},
+    {"label": "05 model-swap",       "type": "shell", "command": "make model-swap",       "group": "build"},
+    {"label": "06 pack-report",      "type": "shell", "command": "make pack-report",      "group": "build"},
+    {"label": "07 challenge-plan",   "type": "shell", "command": "make challenge-plan",   "group": "build"},
+    {"label": "08 adapt-pipeline",   "type": "shell", "command": "make adapt-pipeline",   "group": "build"},
+    {"label": "09 translation-memo", "type": "shell", "command": "make translation-memo", "group": "build"},
+    {"label": "run-day1",            "type": "shell", "command": "make run-day1",         "group": "build"},
+    {"label": "run-day2",            "type": "shell", "command": "make run-day2",         "group": "build"},
+    {"label": "app",                 "type": "shell", "command": "make app",              "group": "build"},
+    {"label": "test",                "type": "shell", "command": "make test",             "group": "test"}
+  ]
+}
