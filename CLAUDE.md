@@ -5,19 +5,59 @@ This file is the project-level contract between you and the student.
 
 ---
 
-## Repository purpose
+## Design authority
 
-You are helping a PhD student complete a staged medical image analysis workflow.
-The workflow has 10 stages (stage_00 through stage_09).
-Each stage produces specific artifacts. Later stages depend on earlier ones.
-Do not attempt to complete multiple stages at once.
+**Primary design specification:** `docs/student_lab_os_design_spec_v1.md`
+
+@docs/student_lab_os_design_spec_v1.md
+
+If any instruction in this file conflicts with the design spec, the design spec takes precedence.
+This CLAUDE.md provides operational shortcuts and concrete path rules; the design spec provides conceptual authority.
 
 ---
 
-## Staged workflow
+## Repository purpose
+
+This repository is a **Student Lab OS** — a mission-based, prompt-driven, dashboard-guided, artifact-producing research training environment for a PhD-level Medical AI summer school.
+
+Students are positioned as junior clinical AI investigators working through a sequence of research missions. They do not need traditional programming fluency. They learn by using **prompts as experimental instruments** and judging results through artifacts, metrics, and scientific reasoning.
+
+This is not a conventional script-execution pipeline. Stages exist to support missions, not as the primary organizing concept.
+
+---
+
+## Student interaction model
+
+- Students act in **VS Code + Claude Code** — this is where prompts are executed and code runs.
+- The **local dashboard** (Streamlit app) is the student's navigation and feedback console: it shows mission guidance, artifacts, metrics, run history, and progress.
+- The dashboard is **not** the Claude chat interface. Students do not interact with Claude through the dashboard.
+- **Prompts are experimental instruments**, not magic commands. Better prompts improve experimental control. Prompts must be grounded in evidence and outputs.
+- The primary student loop is: **dashboard → prompt → VS Code + Claude Code → artifact → dashboard feedback**.
+
+---
+
+## Mission architecture
+
+The lab is organized into missions. Each mission has a goal, a set of allowed files, expected outputs, and completion criteria.
+
+| Mission | Theme | Core goal |
+| ------- | ----- | --------- |
+| Mission 0 — Wake the Lab | Bootstrap | Environment setup, Claude readiness, first prompt-driven success |
+| Mission 1 — Receive the Signal | Data acquisition | Fetch teaching pack, inspect dataset, first image exposure |
+| Mission 2 — Build the First Detector | Modeling | Baseline segmentation/modeling, first meaningful metric, first artifact set |
+| Mission 3 — Investigate Failure | Error analysis | Best/worst case analysis, error maps, failure interpretation, hypothesis formation |
+| Mission 4 — Improve With Intent | Controlled improvement | One controlled improvement, measured comparison, scientific reasoning |
+| Mission 5 — Design the Next Study | Challenge planning | Day 2 challenge plan, adapt the pipeline |
+| Mission 6 — Translate Responsibly | Research judgment | Clinical gap, product gap, human oversight, translation memo |
+
+---
+
+## Stage-to-script mapping (implementation detail)
+
+Stages are the underlying implementation structure that missions are built on. They are not the conceptual center of the student experience — missions are.
 
 | Stage | Script | Key outputs |
-|---|---|---|
+| ----- | ------ | ----------- |
 | stage_00_bootstrap | scripts/bootstrap.py | outputs/status/stage_00_bootstrap.json, reports/env_check.md |
 | stage_01_fetch_sample | scripts/fetch_data.py | data/sample/, outputs/status/stage_01_fetch_sample.json |
 | stage_02_load_visualize | scripts/visualize_sample.py | outputs/figures/sample_overlay.png, reports/data_notes.md |
@@ -46,6 +86,8 @@ Required minimum: `{"status": "ok", ...stage-specific keys...}`
 
 **Reports:** `reports/<name>.md` — written in plain Markdown
 
+**Run history:** `.lab_history/mission_NN/run_NNN/` — prompt text, result, changed files, notes
+
 ---
 
 ## Naming rules
@@ -62,10 +104,10 @@ Required minimum: `{"status": "ok", ...stage-specific keys...}`
 
 - Read the relevant prompt in `prompts/` before making any changes
 - State your plan in plain language before editing any file — the student should approve it
-- Edit the smallest number of files needed to complete the current stage
+- Edit the smallest number of files needed to advance the current mission
 - Prefer adding to existing scripts rather than rewriting them
-- One stage at a time — do not reach ahead
-- After completing a stage, confirm that `make <stage-command>` runs without errors
+- Focus on one mission at a time; do not race ahead into unrelated missions or stages
+- After completing a mission, verify that the expected artifacts exist and `make <stage-command>` runs without errors
 
 ---
 
@@ -85,7 +127,7 @@ Required minimum: `{"status": "ok", ...stage-specific keys...}`
 - Never write a report that contradicts the actual computed metrics
 - If a result is poor, report it honestly and explain what the numbers mean
 - If a script raises an error, diagnose and fix the root cause — do not catch and suppress errors silently
-- If a stage cannot complete due to missing data, say so clearly rather than writing a stub status
+- If a mission cannot complete due to missing data, say so clearly rather than writing a stub status
 
 ---
 
@@ -102,21 +144,35 @@ Required minimum: `{"status": "ok", ...stage-specific keys...}`
 
 ---
 
-## Files Claude is expected to edit
+## Files Claude may edit
 
-- `scripts/*.py` — extend and complete stage logic per the prompt instructions
-- `reports/*.md` — write and update stage summaries
-- `app/streamlit_app.py` — extend the dashboard if explicitly instructed
-- `prompts/*.md` — never edit these; they are the student's instructions
-- `docs/classroom_handoff.md` — instructor-only reference; do not modify
+- `scripts/*.py` — extend and complete mission logic per the prompt instructions
+- `reports/*.md` — write and update mission summaries
+- `app/streamlit_app.py` — extend the dashboard only if explicitly instructed
+- `.lab_history/**` — run history and prompt ledger records
+
+## Files Claude must not edit without explicit instruction
+
+- `prompts/*.md` — these are the student's experimental instruments; never modify them
+- `docs/classroom_handoff.md` — instructor-only reference
+- `.github/workflows/*.yml` — grading infrastructure
+- `tests/*.py` — autograding tests
+- `requirements.txt` — only update if a new package is genuinely required for the current mission
+- `artifacts/schema.json` — output contract definition
+- `ASSIGNMENT.md` — course instructions, not a working document
+- `Makefile` — only update if adding a new make target is explicitly part of the mission work
+- `docs/student_lab_os_design_spec_v1.md` — design authority; do not modify
 
 ---
 
-## Files Claude should not change without explicit instruction
+## Summary
 
-- `.github/workflows/*.yml` — grading infrastructure
-- `tests/*.py` — autograding tests
-- `requirements.txt` — only update if a new package is genuinely required for the current stage
-- `artifacts/schema.json` — output contract definition
-- `ASSIGNMENT.md` — course instructions, not a working document
-- `Makefile` — only update if adding a new make target is explicitly part of the stage work
+This repository is student-facing. It is not primarily a teacher dashboard repo.
+
+The student is a junior clinical AI investigator. Their work is judged by artifacts, metrics, comparisons, and reports — not by chat verbosity or raw code complexity.
+
+The main loop is:
+
+> **dashboard → prompt → VS Code + Claude Code → artifact → dashboard**
+
+Every action you take should serve that loop: help the student advance a mission, produce a real artifact, and return to the dashboard with something new to inspect.

@@ -1,9 +1,9 @@
 # Model Swap — Largest Connected Component Post-Processing
 
-Dataset: BraTS_teaching_pack
-Modality: FLAIR
+Dataset: ?
+Modality: FLAIR (channel 3), per-slice normalised to [0, 255]
 Threshold: 0.5
-Slices evaluated: 20
+Slices evaluated: 10
 
 ## Change Made
 
@@ -17,19 +17,19 @@ The threshold baseline sometimes produces scattered small positive predictions t
 
 | Method | Mean Dice |
 |---|---|
-| Baseline (threshold = 0.5) | 0.1209 |
-| Largest-CC post-processing | 0.1238 |
-| Delta | +0.0029 |
+| Baseline (threshold = 0.5) | 0.5741 |
+| Largest-CC post-processing | 0.5917 |
+| Delta | +0.0176 |
 
 See: `outputs/figures/model_swap_comparison.png`
-Representative slice: 16
+Representative slice: 1
 (selected as the slice where the change had the largest absolute effect)
 
 ## Interpretation
 
 The controlled change improved the mean Dice score.
 
-The largest-CC filter helped on this dataset. It removed small isolated positive predictions that were false alarms, improving the mean Dice by +0.0029. This confirms that the baseline threshold produces some spurious scattered predictions, and that the target region is reasonably well-described as a single connected structure.
+The largest-CC filter helped on this dataset. It removed small isolated positive predictions that were false alarms, improving the mean Dice by +0.0176. This confirms that the baseline threshold produces some spurious scattered predictions, and that the target region is reasonably well-described as a single connected structure.
 
 ## What to Take Away
 

@@ -1,9 +1,9 @@
 # Clinical Translation Memo
 
-**Pipeline:** BraTS_teaching_pack tumour segmentation prototype
-**Modality:** FLAIR
-**Evaluation dataset:** 20 2-D slices from BraTS_teaching_pack
-**Best result achieved:** Mean Dice = 0.1258 (Otsu adaptive thresholding + largest-CC post-processing)
+**Pipeline:** a teaching-pack dataset tumour segmentation prototype
+**Modality:** FLAIR (channel 3), per-slice normalised to [0, 255]
+**Evaluation dataset:** 10 2-D slices from a teaching-pack dataset
+**Best result achieved:** Mean Dice = 0.5917 (largest-CC post-processing)
 
 ---
 
@@ -13,7 +13,7 @@ This pipeline is a **research prototype**, not a clinical tool.
 
 **What it does:**
 
-- Ingests normalised FLAIR slices and outputs binary tumour segmentation masks.
+- Ingests normalised FLAIR (channel 3), per-slice normalised to [0, 255] slices and outputs binary tumour segmentation masks.
 - Applies a deterministic thresholding rule (originally a fixed threshold,
   then per-slice Otsu adaptive thresholding in the Day 2 challenge).
 - Evaluates predictions against ground-truth masks using the Dice similarity
@@ -26,7 +26,7 @@ This pipeline is a **research prototype**, not a clinical tool.
   parameters; it applies a hand-crafted intensity rule.
 - It processes **2-D slices independently**, ignoring the 3-D continuity of
   real tumour volumes. Clinical segmentation systems operate on full 3-D volumes.
-- It has been evaluated on 20 slices from a single curated teaching pack.
+- It has been evaluated on 10 slices from a single curated teaching pack.
   This is far too small a sample to draw any conclusions about generalisability.
 - It has **not been validated** against radiologist annotations. The ground-truth
   masks used here are provided for educational purposes, not as clinical reference
@@ -42,7 +42,7 @@ For this pipeline to constitute a publishable research contribution, the
 following steps would be required, roughly in order:
 
 1. **Scale the dataset.** A minimum of several hundred patients, ideally from
-   multiple institutions and scanners. The 20-slice teaching pack is
+   multiple institutions and scanners. The 10-slice teaching pack is
    not a valid research dataset.
 
 2. **Replace the threshold with a learned model.** A convolutional neural
@@ -54,7 +54,7 @@ following steps would be required, roughly in order:
    volumes, not per-slice Dice on independent 2-D slices.
 
 4. **External validation.** Evaluate on at least one dataset not used during
-   development, from a different institution or scanner. Dice = 0.1258
+   development, from a different institution or scanner. Dice = 0.5917
    on the training/evaluation set does not predict performance on unseen data.
 
 5. **Inter-rater reliability.** The ceiling for segmentation metrics is not 1.0 —
@@ -102,9 +102,9 @@ Clinical deployment involves requirements beyond research validity:
 **This prototype has been evaluated on the same data it was calibrated on.**
 
 The fixed threshold (t=0.5) and the Otsu-adaptive variant were both
-tuned and evaluated on the BraTS_teaching_pack teaching pack.  There has been no
+tuned and evaluated on the a teaching-pack dataset teaching pack.  There has been no
 held-out test set, no cross-validation, and no external validation cohort.
-The Dice score of 0.1258 is an in-sample estimate and almost
+The Dice score of 0.5917 is an in-sample estimate and almost
 certainly overestimates the performance a clinical collaborator would see
 on their own scanner or patient population.
 
@@ -119,9 +119,9 @@ not performance claims.
 
 | Pipeline | Mean Dice |
 |---|---|
-| Fixed threshold (t=0.5) | 0.1209 |
-| + Largest-CC post-processing | 0.1238 |
-| + Otsu adaptive thresholding + CC | 0.1258 |
+| Fixed threshold (t=0.5) | 0.5741 |
+| + Largest-CC post-processing | 0.5917 |
+| + Otsu adaptive thresholding + CC | 0.5657 |
 
-All results on 20 slices from BraTS_teaching_pack (FLAIR).
+All results on 10 slices from a teaching-pack dataset (FLAIR (channel 3), per-slice normalised to [0, 255]).
 No train/test split. Results are in-sample.

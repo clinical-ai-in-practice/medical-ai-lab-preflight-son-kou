@@ -1,8 +1,8 @@
 {
   "status": "ok",
-  "dataset": "BraTS_teaching_pack",
-  "modality": "FLAIR",
-  "n_slices": 20,
-  "best_dice": 0.1258,
-  "best_method": "Otsu adaptive thresholding + largest-CC post-processing"
+  "dataset": "a teaching-pack dataset",
+  "modality": "FLAIR (channel 3), per-slice normalised to [0, 255]",
+  "n_slices": 10,
+  "best_dice": 0.5917,
+  "best_method": "largest-CC post-processing"
 }

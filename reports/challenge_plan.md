@@ -1,8 +1,8 @@
 # Day 2 Challenge Plan
 
-Dataset: BraTS_teaching_pack
-Modality: FLAIR
-Slices: 20
+Dataset: ?
+Modality: FLAIR (channel 3), per-slice normalised to [0, 255]
+Slices: 10
 
 ---
 
@@ -11,10 +11,10 @@ Slices: 20
 | Stage | Result |
 |---|---|
 | Baseline threshold | 0.5 |
-| Baseline mean Dice | 0.1209 |
-| After largest-CC post-processing | 0.1238  (Δ +0.0029) |
-| Best slice (slice 15) | Dice = 0.2570 |
-| Worst slice (slice 8) | Dice = 0.0339 |
+| Baseline mean Dice | 0.5741 |
+| After largest-CC post-processing | 0.5917  (Δ +0.0176) |
+| Best slice (slice 3) | Dice = 0.8697 |
+| Worst slice (slice 9) | Dice = 0.0437 |
 
 ---
 
@@ -24,7 +24,7 @@ The Day 1 error analysis revealed that the fixed threshold (t = 0.5) is
 **sensitive to slice-level intensity variation**.  Slices where tumour pixels happen
 to be brighter than the population mean perform well; slices where the intensity
 distributions of tumour and background overlap perform poorly (Dice gap of
-0.2231).
+0.8260).
 
 The root cause is that a single global threshold ignores per-slice differences in
 brightness, contrast, and scanner gain.  A fixed constant cannot adapt to slices
@@ -89,7 +89,7 @@ The comparison will therefore be:
 
 ## Success Criteria
 
-- `new_dice` is computed fairly: same 20 slices, same GT masks, only the
+- `new_dice` is computed fairly: same 10 slices, same GT masks, only the
   threshold method changes.
 - The change is **honest**: if Otsu performs worse than the fixed threshold,
   that outcome is reported and explained.
@@ -113,7 +113,7 @@ The comparison will therefore be:
    tumour.  This would show as degraded performance relative to the fixed
    threshold on some slices.  This is a valid, instructive finding — not a bug.
 
-3. **Comparison confound.** The baseline Dice reported in Day 1 (0.1209)
+3. **Comparison confound.** The baseline Dice reported in Day 1 (0.5741)
    was computed without largest-CC post-processing.  To keep the Day 2 comparison
    clean, Stage 08 will report the *pure fixed-threshold baseline* alongside the
    *Otsu + CC* pipeline, and note the confound explicitly in the report.

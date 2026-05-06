@@ -1,19 +1,19 @@
 {
   "status": "ok",
   "threshold": 0.5,
-  "n_slices": 20,
+  "n_slices": 10,
   "best_case": {
-    "slice_idx": 15,
-    "dice": 0.257,
-    "true_positives": 333,
-    "false_positives": 1885,
-    "false_negatives": 40
+    "slice_idx": 3,
+    "dice": 0.8697,
+    "true_positives": 2139,
+    "false_positives": 75,
+    "false_negatives": 566
   },
   "worst_case": {
-    "slice_idx": 8,
-    "dice": 0.0339,
-    "true_positives": 36,
-    "false_positives": 2022,
-    "false_negatives": 33
+    "slice_idx": 9,
+    "dice": 0.0437,
+    "true_positives": 113,
+    "false_positives": 4088,
+    "false_negatives": 852
   }
 }

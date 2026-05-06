@@ -2,9 +2,27 @@
 
 **PhD Course: Medical AI + Agentic Coding for Clinical Research**
 
-This is your personal lab workspace. You will use **Claude Code** — an AI coding assistant — together with structured prompt files and scaffolded scripts to build a reproducible medical image analysis pipeline over two lab sessions.
+This is your personal lab workspace for a two-day research training experience in medical image AI. You are positioned as a **junior clinical AI investigator**. Your goal is to build a reproducible segmentation pipeline, investigate its failures, make one justified improvement, and produce written outputs suitable for clinical discussion.
 
-The goal is not just to produce a result. It is to produce a result you can explain, reproduce, and defend.
+You do not need traditional programming fluency. You work by writing structured prompts in **VS Code + Claude Code**, guided by a local dashboard that shows your current mission, required artifacts, and progress.
+
+---
+
+## How the lab works
+
+The lab is organized as a sequence of research **missions**, not a list of scripts to execute. Each mission has a clear scientific goal, a set of expected artifacts, and a completion state you can verify.
+
+The primary loop for every mission is:
+
+> **dashboard → prompt → VS Code + Claude Code → artifact → dashboard**
+
+1. Open the dashboard (`make dashboard`) and read the current mission.
+2. Copy or adapt the mission prompt shown in the dashboard's Prompt Studio tab.
+3. Go to VS Code + Claude Code and run the prompt-driven task.
+4. Return to the dashboard and inspect the new artifacts, metrics, and feedback.
+5. When the mission checklist shows complete, create a checkpoint commit and push.
+
+**The dashboard is your navigation and feedback console.** It shows mission guidance, artifact previews, and submission readiness. Claude interaction happens in VS Code + Claude Code — not in the dashboard.
 
 ---
 
@@ -20,122 +38,113 @@ make preflight
 # 3. Download the teaching data sample
 make fetch-sample
 
-# 4. Open the progress dashboard
-make app
+# 4. Open the mission dashboard
+make dashboard
 ```
 
-If `make preflight` and `make fetch-sample` complete without errors, you are ready
-to begin Stage 02.
+If `make preflight` and `make fetch-sample` complete without errors, you are ready to begin Mission 2.
 
-> **Note for first-time users:** `make preflight` bootstraps the environment and
-> runs a quick structural test.  Run it before `make fetch-sample` to catch any
-> missing dependencies early.
+> **Note:** `make preflight` bootstraps the environment and runs a quick structural check. Run it before `make fetch-sample` to catch any missing dependencies early.
 
 ---
 
-## The two-day workflow
-
-This lab follows 10 staged steps. Each stage has:
-- a **prompt file** in `prompts/` that tells you what to ask Claude Code
-- a **script** in `scripts/` that runs the stage logic
-- a **status file** written to `outputs/status/` when the stage completes
+## Mission sequence
 
 ### Day 1 — Build a reproducible baseline
 
-| Stage | Make command | What it produces |
+| Mission | Scientific goal | Key artifacts |
 |---|---|---|
-| 00 Bootstrap | `make bootstrap` | `outputs/status/stage_00_bootstrap.json`, `reports/env_check.md` |
-| 01 Fetch sample | `make fetch-sample` | `data/sample/`, `outputs/status/stage_01_fetch_sample.json` |
-| 02 Load & visualize | `make visualize` | `outputs/figures/sample_overlay.png`, `reports/data_notes.md` |
-| 03 Train baseline | `make smoke-train` | `outputs/metrics/val_metrics.json`, `outputs/figures/loss_curve.png`, `reports/train_notes.md` |
-| 04 Error analysis | `make error-analysis` | `reports/error_analysis.md`, `outputs/figures/error_analysis_*.png` |
-| 05 Model swap | `make model-swap` | `outputs/metrics/model_swap_comparison.json`, `reports/model_swap.md` |
-| 06 Pack Day 1 report | `make pack-report` | `reports/day1_summary.md` |
+| Mission 0 — Wake the Lab | Environment setup, first prompt-driven success | `reports/env_check.md` |
+| Mission 1 — Receive the Signal | Fetch teaching pack, inspect dataset | `data/sample/`, `reports/data_notes.md` |
+| Mission 2 — Build the First Detector | Baseline model, first meaningful metric | `outputs/metrics/val_metrics.json`, `reports/train_notes.md` |
+| Mission 3 — Investigate Failure | Error analysis, hypothesis formation | `reports/error_analysis.md`, error figures |
+| Mission 4 — Improve With Intent | One controlled improvement, measured comparison | `outputs/metrics/model_swap_comparison.json`, `reports/model_swap.md` |
+| Mission 5 — Pack the Report | Day 1 summary | `reports/day1_summary.md` |
 
 ### Day 2 — Tackle the harder challenge
 
-| Stage | Make command | What it produces |
+| Mission | Scientific goal | Key artifacts |
 |---|---|---|
-| 07 Challenge plan | `make challenge-plan` | `reports/challenge_plan.md` |
-| 08 Adapt pipeline | `make adapt-pipeline` | Updated scripts, new figures |
-| 09 Translation memo | `make translation-memo` | `reports/translation_memo.md` |
+| Mission 5 — Design the Next Study | Challenge planning, pipeline adaptation | `reports/challenge_plan.md`, `reports/adapt_pipeline.md` |
+| Mission 6 — Translate Responsibly | Clinical gap, human oversight, translation memo | `reports/translation_memo.md` |
 
-Run a full day in sequence:
-
-```bash
-make run-day1   # stages 00–06
-make run-day2   # stages 07–09
-```
+Complete one mission before beginning the next. The dashboard's Evaluation tab shows which missions are complete.
 
 ---
 
-## How to use Claude Code in this lab
+## How to use Claude Code
 
-Each stage prompt in `prompts/` is a starting point for your conversation with Claude Code. The workflow is:
+Each mission has a prompt in `prompts/`. The workflow is:
 
-1. Open the prompt file for the current stage (e.g., `prompts/stage_02_load_visualize.md`)
-2. Paste or summarize it in your Claude Code session
-3. **Ask Claude to explain its plan before it edits anything**
-4. Review the plan, ask questions, then let it proceed
-5. Run `make <stage-command>` to execute the result
-6. Check the dashboard: `make app`
+1. Read the mission prompt in the dashboard (Prompt Studio tab) or open the file directly.
+2. Paste or adapt it in your Claude Code session in VS Code.
+3. **Ask Claude to explain its plan before it edits anything.**
+4. Review the plan, ask questions, then let it proceed.
+5. Return to the dashboard to inspect the new artifacts.
 
 **Important rules:**
-- Never ask Claude to skip a stage or jump ahead
+- Never ask Claude to skip a mission or jump ahead
 - Never ask Claude to fabricate or invent metric values
 - If Claude's plan touches files you don't understand, ask it to explain them first
-- Commit your work after each stage passes — small, frequent commits are better than one large final push
+- Push a checkpoint commit after each completed mission
 
 ---
 
 ## Project layout
 
 ```
-prompts/          stage-by-stage prompt files — read these to guide Claude Code
-scripts/          one Python script per stage — Claude extends these
+prompts/          mission prompt files — read these to guide Claude Code
+scripts/          one Python script per mission stage — Claude extends these
 outputs/
-  figures/        PNG figures produced by each stage
-  metrics/        JSON metric files (val_metrics.json, model_swap_comparison.json)
+  figures/        PNG figures produced by each mission
+  metrics/        JSON metric files (val_metrics.json, model_swap_comparison.json, ...)
   status/         per-stage status files written by scripts — do not edit manually
 reports/          written summaries — you and Claude write these together
 data/sample/      teaching data (regenerated by make fetch-sample, not committed to git)
-app/              Streamlit dashboard showing all stage progress
+app/              mission dashboard — open with make dashboard
 tests/            autograding tests
 artifacts/        output contract definition used by grading
+docs/             design spec and instructor reference docs
 ```
 
 ---
 
 ## What gets graded
 
-Grading checks that your repository contains the required artifacts with correct
-structure.  See [`ASSIGNMENT.md`](ASSIGNMENT.md) for the full submission checklist
-and [`artifacts/schema.json`](artifacts/schema.json) for the machine-readable contract.
+Grading checks that your repository contains the required artifacts with correct structure. See [ASSIGNMENT.md](ASSIGNMENT.md) for the full mission sequence, artifact requirements, and evaluation criteria.
 
-Quick check: `make test` runs the **same 67 tests** that CI runs on every push.
-When all pass locally, your push will be green.
+Quick check: `make test` runs the **same 67 tests** that CI runs on every push. When all pass locally, your push will be green. The dashboard's Evaluation tab shows the same checks in real time.
 
 ---
 
-## Useful commands
+## Command reference
+
+These commands are how the pipeline executes underneath the mission-based workflow. The dashboard guides when to use them; you do not need to run them in order manually.
 
 ```bash
-make preflight        # Structural checks — run this first (no data needed)
-make bootstrap        # Stage 00
-make fetch-sample     # Stage 01
-make visualize        # Stage 02
-make smoke-train      # Stage 03
-make error-analysis   # Stage 04
-make model-swap       # Stage 05
-make pack-report      # Stage 06
-make challenge-plan   # Stage 07
-make adapt-pipeline   # Stage 08
-make translation-memo # Stage 09
-make run-day1         # Stages 00–06 in sequence
-make run-day2         # Stages 07–09 in sequence
-make app              # Open Streamlit dashboard
+# Dashboard and environment
+make dashboard        # Open mission dashboard (primary student interface)
+make preflight        # Structural checks — run first (no data needed)
+
+# Day 1 mission stages
+make bootstrap        # Mission 0 — environment setup
+make fetch-sample     # Mission 1 — fetch teaching pack
+make visualize        # Mission 2 — load data, produce overlay figures
+make smoke-train      # Mission 2 — run baseline model, write metrics
+make error-analysis   # Mission 3 — identify best and worst predictions
+make model-swap       # Mission 4 — make one controlled change, compare
+make pack-report      # Mission 5 — assemble Day 1 summary report
+
+# Day 2 mission stages
+make challenge-plan   # Mission 5/6 — write plan for harder challenge
+make adapt-pipeline   # Mission 5/6 — implement planned changes
+make translation-memo # Mission 6 — write clinical translation memo
+
+# Sequences
+make run-day1         # Missions 0–5, Day 1 stages in order
+make run-day2         # Missions 5–6, Day 2 stages in order
+
+# Testing
 make test             # Run autograding tests (same as CI)
 make help             # List all commands
 ```
-# student-classroom-repo
-# student-classroom-repo

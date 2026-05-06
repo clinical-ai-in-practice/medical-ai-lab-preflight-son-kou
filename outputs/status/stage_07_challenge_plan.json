@@ -1,7 +1,7 @@
 {
   "status": "ok",
   "proposed_change": "Per-slice Otsu adaptive thresholding + largest-CC post-processing",
-  "baseline_dice": 0.1209,
+  "baseline_dice": 0.5741,
   "identified_weakness": "Fixed threshold is sensitive to slice-level intensity variation",
-  "n_slices": 20
+  "n_slices": 10
 }

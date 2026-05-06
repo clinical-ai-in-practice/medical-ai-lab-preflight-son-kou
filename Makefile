@@ -1,6 +1,6 @@
 .PHONY: bootstrap fetch-sample inspect-data visualize smoke-train error-analysis model-swap \
         pack-report challenge-plan adapt-pipeline translation-memo \
-        run-day1 run-day2 app test check preflight help
+        run-day1 run-day2 app dashboard test check preflight help
 
 help:
 	@echo "Medical AI + Agentic Coding Lab — available commands"
@@ -25,7 +25,8 @@ help:
 	@echo "  make run-day2           Stages 07–09 in order"
 	@echo ""
 	@echo "Other:"
-	@echo "  make app                Launch Streamlit progress dashboard"
+	@echo "  make dashboard          Open mission dashboard (primary student interface)"
+	@echo "  make app                Alias for make dashboard"
 	@echo "  make preflight          Structural checks — no data required (run first)"
 	@echo "  make test               Run full autograding tests (same as CI)"
 	@echo "  make check              Alias for make test"
@@ -68,6 +69,10 @@ run-day1: bootstrap fetch-sample visualize smoke-train error-analysis model-swap
 run-day2: challenge-plan adapt-pipeline translation-memo
 
 app:
+	python -m streamlit run app/streamlit_app.py
+
+# Alias — identical to make app
+dashboard:
 	python -m streamlit run app/streamlit_app.py
 
 # Run the full visible autograding test suite (same command CI uses)

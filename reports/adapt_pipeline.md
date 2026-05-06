@@ -1,8 +1,8 @@
 # Adapt Pipeline — Day 2 Challenge
 
-Dataset: BraTS_teaching_pack
-Modality: FLAIR
-Slices evaluated: 20
+Dataset: ?
+Modality: FLAIR (channel 3), per-slice normalised to [0, 255]
+Slices evaluated: 10
 
 ---
 
@@ -35,27 +35,27 @@ histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66.
 
 | Pipeline | Mean Dice |
 |---|---|
-| Fixed threshold (t=0.5) + CC | 0.1238 |
-| Otsu per-slice + CC | 0.1258 |
-| Delta | +0.0021 |
+| Fixed threshold (t=0.5) + CC | 0.5917 |
+| Otsu per-slice + CC | 0.5657 |
+| Delta | -0.0259 |
 
-Otsu threshold statistics across 20 slices:
-- Mean: 0.5048
-- Std:  0.0066
-- Min:  0.4902
-- Max:  0.5215
+Otsu threshold statistics across 10 slices:
+- Mean: 0.4034
+- Std:  0.1058
+- Min:  0.2041
+- Max:  0.5371
 
 See: `outputs/figures/challenge_comparison.png`
-Representative slice: 16
+Representative slice: 1
 (selected as the slice where the two methods differed most)
 
 ---
 
 ## Interpretation
 
-The Day 2 adaptation improved the mean Dice score.
+The Day 2 adaptation degraded the mean Dice score.
 
-Per-slice Otsu thresholding outperformed the fixed threshold. The mean Dice improved by +0.0021, confirming that per-slice intensity calibration addresses the sensitivity identified in the Day 1 error analysis. The Otsu thresholds varied across slices (mean 0.505 ± 0.007), showing that no single fixed value is optimal for all slices in this pack.
+Per-slice Otsu thresholding did not outperform the fixed threshold on this pack (Δ = -0.0259). The Otsu thresholds varied (mean 0.403 ± 0.106); on slices with poorly separated intensity modes, Otsu can set a threshold that includes too much background or misses sparse tumour pixels. This is a valid, informative finding: the assumption that intensity histograms are bimodal does not hold uniformly across this dataset.
 
 ---
 

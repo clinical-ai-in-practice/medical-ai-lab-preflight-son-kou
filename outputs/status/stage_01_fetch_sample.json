@@ -1,9 +1,9 @@
 {
   "status": "ok",
-  "dataset": "BraTS_teaching_pack",
+  "dataset": "unknown",
   "source": "local",
-  "n_slices": 20,
-  "modality": "FLAIR",
+  "n_slices": 10,
+  "modality": "FLAIR (channel 3), per-slice normalised to [0, 255]",
   "npz_keys": [
     "images",
     "masks"
