@@ -1,9 +1,9 @@
 # Error Analysis
 
-Dataset: BraTS_teaching_pack
-Modality: FLAIR
+Dataset: ?
+Modality: FLAIR (channel 3), per-slice normalised to [0, 255]
 Threshold used: 0.5
-Slices analysed: 20
+Slices analysed: 10
 
 ## Method
 
@@ -11,14 +11,14 @@ Each slice is segmented with the same intensity threshold (0.5) used in the
 baseline. We compute Dice between the thresholded prediction and the ground-truth
 mask, then rank slices from best to worst.
 
-## Best Case — Slice 15  (Dice = 0.2570)
+## Best Case — Slice 3  (Dice = 0.8697)
 
 | Metric | Value |
 |---|---|
-| Ground-truth positives | 373 px |
-| True positives (TP) | 333 px |
-| False positives (FP) | 1885 px |
-| False negatives (FN) | 40 px |
+| Ground-truth positives | 2705 px |
+| True positives (TP) | 2139 px |
+| False positives (FP) | 75 px |
+| False negatives (FN) | 566 px |
 
 The prediction closely matches the ground truth on this slice.
 The tumour pixels have a noticeably higher intensity than background, making
@@ -27,14 +27,14 @@ well-suited to.
 
 See: `outputs/figures/error_analysis_best.png`
 
-## Worst Case — Slice 8  (Dice = 0.0339)
+## Worst Case — Slice 9  (Dice = 0.0437)
 
 | Metric | Value |
 |---|---|
-| Ground-truth positives | 69 px |
-| True positives (TP) | 36 px |
-| False positives (FP) | 2022 px |
-| False negatives (FN) | 33 px |
+| Ground-truth positives | 965 px |
+| True positives (TP) | 113 px |
+| False positives (FP) | 4088 px |
+| False negatives (FN) | 852 px |
 
 The dominant error is **false positives** — the model predicts tumour where there is none. The intensity threshold is too permissive for this slice.
 
@@ -42,8 +42,8 @@ See: `outputs/figures/error_analysis_worst.png`
 
 ## Reflection
 
-The performance gap between best and worst case is 0.2232
-(best Dice = 0.2570, worst = 0.0339, overall mean = 0.1209).
+The performance gap between best and worst case is 0.8259
+(best Dice = 0.8697, worst = 0.0437, overall mean = 0.5741).
 
 A fixed intensity threshold is brittle because it does not use any spatial
 context — it treats every pixel independently. The cases where it fails

@@ -8,7 +8,7 @@
     "model_swap"
   ],
   "missing": [],
-  "dataset": "BraTS_teaching_pack",
-  "baseline_dice": 0.1209,
-  "model_swap_delta": 0.0029
+  "dataset": "unknown",
+  "baseline_dice": 0.5741,
+  "model_swap_delta": 0.0176
 }

@@ -2,15 +2,15 @@
 
 ## 1. Environment
 
-- Python: 3.13.7
+- Python: 3.13.12
 - Platform: macOS-26.3.1-x86_64-i386-64bit-Mach-O
 - Bootstrap: completed ✓
 
 ## 2. Dataset
 
-- Dataset: BraTS_teaching_pack
-- Modality: FLAIR
-- Slices in teaching pack: 20
+- Dataset: unknown
+- Modality: FLAIR (channel 3), per-slice normalised to [0, 255]
+- Slices in teaching pack: 10
 - Location: `data/sample/imaging/`
 
 ## 3. Visualisation
@@ -21,7 +21,7 @@ See: `outputs/figures/sample_overlay.png`
 ## 4. Baseline Segmentation
 
 - Method: intensity threshold at 0.5
-- Mean Dice across 20 slices: 0.1209 ± 0.0647
+- Mean Dice across 10 slices: 0.5741 ± 0.2363
 
 The baseline applies a fixed intensity threshold to each normalised MRI slice.
 It is intentionally simple — its purpose is to establish a reproducible
@@ -29,8 +29,8 @@ reference point, not to achieve clinical performance.
 
 ## 5. Error Analysis
 
-- Best case:  slice 15  Dice = 0.2570
-- Worst case: slice 8  Dice = 0.0339
+- Best case:  slice 3  Dice = 0.8697
+- Worst case: slice 9  Dice = 0.0437
 
 The gap between best and worst case quantifies how sensitive the threshold
 method is to slice-level intensity variation. Slices where tumour pixels are
@@ -42,9 +42,9 @@ Figures: `outputs/figures/error_analysis_best.png`,
 ## 6. Controlled Improvement
 
 - Change: Post-processed threshold predictions by retaining only the single largest connected component per slice, discarding all smaller isolated regions.
-- Baseline Dice: 0.1209
-- New Dice:      0.1238
-- Delta:         +0.0029  → improved
+- Baseline Dice: 0.5741
+- New Dice:      0.5917
+- Delta:         +0.0176  → improved
 
 The experiment demonstrates how a single auditable change can be evaluated
 with a fair comparison. Whether it helped, hurt, or changed nothing is

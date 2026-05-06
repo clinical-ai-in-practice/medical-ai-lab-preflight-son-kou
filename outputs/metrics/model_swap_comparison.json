@@ -1,9 +1,9 @@
 {
-  "baseline_dice": 0.1209,
-  "new_dice": 0.1238,
-  "delta": 0.0029,
+  "baseline_dice": 0.5741,
+  "new_dice": 0.5917,
+  "delta": 0.0176,
   "change_description": "Post-processed threshold predictions by retaining only the single largest connected component per slice, discarding all smaller isolated regions.",
   "threshold": 0.5,
-  "n_slices": 20,
-  "representative_slice_idx": 16
+  "n_slices": 10,
+  "representative_slice_idx": 1
 }
