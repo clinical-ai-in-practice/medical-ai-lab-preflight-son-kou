@@ -1,6 +1,6 @@
 .PHONY: bootstrap fetch-sample inspect-data visualize smoke-train error-analysis model-swap \
         pack-report challenge-plan adapt-pipeline translation-memo \
-        run-day1 run-day2 app dashboard test check preflight help
+        run-day1 run-day2 app dashboard test check preflight reset-student-state help
 
 help:
 	@echo "Medical AI + Agentic Coding Lab — available commands"
@@ -30,6 +30,7 @@ help:
 	@echo "  make preflight          Structural checks — no data required (run first)"
 	@echo "  make test               Run full autograding tests (same as CI)"
 	@echo "  make check              Alias for make test"
+	@echo "  make reset-student-state  Reset to clean Mission 0 (instructor use)"
 
 bootstrap:
 	python scripts/bootstrap.py
@@ -88,3 +89,8 @@ check:
 preflight:
 	python scripts/bootstrap.py
 	pytest -q tests/test_preflight.py tests/test_scripts_exist.py
+
+# Reset student runtime state to a clean Mission 0 start (instructor use)
+# Archives current session to .session_archives/ before clearing anything
+reset-student-state:
+	python scripts/reset_student_state.py --force

@@ -1,27 +1,571 @@
 """
-Student Lab OS — Mission Dashboard
-Navigation and feedback console for the Medical AI + Agentic Coding lab.
+Student Lab OS — Mission Cockpit
+Single-screen guided research console for the Medical AI + Agentic Coding Lab.
 
-This dashboard is for orientation, artifact inspection, and submission readiness.
-Claude interaction happens in VS Code + Claude Code, not here.
+Students operate in VS Code + Claude Code.
+This dashboard is orientation, mission guidance, artifact preview, and progress.
 """
 
 from pathlib import Path
+from datetime import datetime, timezone
 import json
 import re
 import streamlit as st
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
 
-BASE = Path(__file__).resolve().parents[1]
+BASE       = Path(__file__).resolve().parents[1]
+STATE_PATH = BASE / ".student_state" / "current_mission.json"
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Medical AI Lab — Mission Dashboard",
-    layout="wide",
-    initial_sidebar_state="collapsed",
+    page_title   = "Medical AI Lab",
+    layout       = "wide",
+    initial_sidebar_state = "expanded",
 )
+
+# ── Global CSS ────────────────────────────────────────────────────────────────
+
+def inject_css() -> None:
+    st.markdown("""
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE — light slate shell, white cards, dark ink
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html, body, .stApp {
+    background-color: #EEF2F7 !important;
+    color: #1E293B !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+.stApp > header {
+    background-color: #EEF2F7 !important;
+    border-bottom: 1px solid #D6DFEA !important;
+}
+.main .block-container {
+    background: transparent !important;
+    padding: 1.4rem 2rem 2.5rem 2rem !important;
+    max-width: none !important;
+}
+
+/* ── Sidebar — deep navy, high-contrast labels ───────────────────────────── */
+section[data-testid="stSidebar"] {
+    background: #0B1526 !important;
+    border-right: none !important;
+}
+section[data-testid="stSidebar"] > div:first-child {
+    background: #0B1526 !important;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+[data-testid="stTabs"] [role="tablist"] {
+    background: transparent !important;
+    border-bottom: 2px solid #D6DFEA !important;
+    gap: 0 !important;
+    padding-bottom: 0 !important;
+}
+[data-testid="stTabs"] [role="tab"] {
+    background: transparent !important;
+    color: #94A3B8 !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    margin-bottom: -2px !important;
+    border-radius: 0 !important;
+    padding: 10px 22px !important;
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+    transition: color 0.15s !important;
+}
+[data-testid="stTabs"] [role="tab"]:hover {
+    color: #475569 !important;
+    background: transparent !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    color: #1E40AF !important;
+    border-bottom: 2px solid #2563EB !important;
+    background: transparent !important;
+}
+
+/* ── Metrics ─────────────────────────────────────────────────────────────── */
+[data-testid="metric-container"] {
+    background: #FFFFFF !important;
+    border: 1px solid #D6DFEA !important;
+    border-radius: 10px !important;
+    padding: 16px 18px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+[data-testid="stMetricLabel"] {
+    color: #64748B !important;
+    font-size: 0.80rem !important;
+    font-weight: 600 !important;
+}
+[data-testid="stMetricValue"] {
+    color: #0F172A !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+}
+[data-testid="stMetricDelta"] svg { display: none !important; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.stButton > button {
+    background: #FFFFFF !important;
+    color: #374151 !important;
+    border: 1px solid #D1D5DB !important;
+    border-radius: 7px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    transition: all 0.15s ease !important;
+    padding: 8px 16px !important;
+}
+.stButton > button:hover {
+    background: #F8FAFC !important;
+    color: #1E293B !important;
+    border-color: #94A3B8 !important;
+}
+.stButton > button[kind="primary"] {
+    background: #1E40AF !important;
+    color: #FFFFFF !important;
+    border: 1px solid #1E40AF !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: #1D4ED8 !important;
+    border-color: #1D4ED8 !important;
+}
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
+.stCodeBlock, .stCodeBlock pre {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+}
+.stCodeBlock code {
+    color: #1E293B !important;
+    font-size: 0.90rem !important;
+    line-height: 1.7 !important;
+}
+.stCodeBlock button {
+    background: #F1F5F9 !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #64748B !important;
+}
+
+/* ── Expanders ───────────────────────────────────────────────────────────── */
+details[data-testid="stExpander"] > summary {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    color: #475569 !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    padding: 10px 16px !important;
+}
+details[data-testid="stExpander"] > summary:hover {
+    background: #F8FAFC !important;
+    color: #1E293B !important;
+}
+details[data-testid="stExpander"] > div {
+    background: #FAFBFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+    padding: 16px 18px !important;
+}
+details[data-testid="stExpander"][open] > summary {
+    border-radius: 8px 8px 0 0 !important;
+    color: #1E293B !important;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.stProgress > div {
+    background: #E2E8F0 !important;
+    border-radius: 4px !important;
+    height: 6px !important;
+}
+.stProgress > div > div {
+    height: 6px !important;
+    background: linear-gradient(90deg, #1E40AF, #3B82F6) !important;
+    border-radius: 4px !important;
+}
+
+/* ── Selectbox ───────────────────────────────────────────────────────────── */
+[data-testid="stSelectbox"] > div > div {
+    background: #FFFFFF !important;
+    border: 1px solid #D1D5DB !important;
+    color: #374151 !important;
+    border-radius: 7px !important;
+}
+
+/* ── Alerts / notifications ──────────────────────────────────────────────── */
+[data-testid="stNotification"],
+.stAlert > div {
+    border-radius: 8px !important;
+    font-size: 0.88rem !important;
+}
+[data-testid="stInfo"]    > div {
+    background: #EFF6FF !important;
+    border-color: #BFDBFE !important;
+    color: #1D4ED8 !important;
+}
+[data-testid="stSuccess"] > div {
+    background: #F0FDF4 !important;
+    border-color: #BBF7D0 !important;
+    color: #15803D !important;
+}
+[data-testid="stWarning"] > div {
+    background: #FFFBEB !important;
+    border-color: #FDE68A !important;
+    color: #92400E !important;
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
+hr { border-color: #E2E8F0 !important; margin: 14px 0 !important; }
+
+/* ── Containers with border=True ─────────────────────────────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+}
+
+/* ── Markdown text ───────────────────────────────────────────────────────── */
+.stMarkdown p {
+    color: #334155 !important;
+    font-size: 0.92rem !important;
+    line-height: 1.70 !important;
+}
+.stMarkdown h1 { color: #0F172A !important; font-size: 1.4rem !important; font-weight: 700 !important; }
+.stMarkdown h2 { color: #1E293B !important; font-size: 1.15rem !important; font-weight: 700 !important; }
+.stMarkdown h3 { color: #334155 !important; font-size: 1.05rem !important; font-weight: 700 !important; }
+.stMarkdown h4 { color: #475569 !important; font-size: 0.95rem !important; font-weight: 700 !important; }
+.stMarkdown code {
+    background: #EFF6FF !important;
+    color: #1E40AF !important;
+    border-radius: 4px !important;
+    padding: 2px 7px !important;
+    font-size: 0.85rem !important;
+}
+.stMarkdown blockquote {
+    border-left: 3px solid #3B82F6 !important;
+    padding-left: 14px !important;
+    color: #475569 !important;
+    background: #F8FAFC !important;
+    border-radius: 0 6px 6px 0 !important;
+    margin: 8px 0 !important;
+}
+.stMarkdown strong { color: #0F172A !important; font-weight: 700 !important; }
+.stMarkdown li { color: #334155 !important; font-size: 0.92rem !important; }
+
+/* ── Captions ────────────────────────────────────────────────────────────── */
+.stCaption { color: #94A3B8 !important; font-size: 0.78rem !important; }
+small.stCaption { color: #94A3B8 !important; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CUSTOM COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Welcome / onboarding ────────────────────────────────────────────────── */
+.welcome-wrap {
+    max-width: 800px;
+    margin: 56px auto 0 auto;
+    text-align: center;
+}
+.welcome-eyebrow {
+    font-size: 0.70rem;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin-bottom: 20px;
+}
+.welcome-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 18px;
+}
+.welcome-sub {
+    font-size: 1.0rem;
+    color: #475569;
+    line-height: 1.70;
+    margin-bottom: 40px;
+}
+.welcome-role-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: left;
+    height: 100%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.welcome-role-eyebrow {
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin-bottom: 6px;
+}
+.welcome-role-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 8px;
+}
+.welcome-role-body {
+    font-size: 0.85rem;
+    color: #475569;
+    line-height: 1.55;
+}
+.welcome-stats {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    color: #94A3B8;
+    margin: 32px 0 36px 0;
+    text-transform: uppercase;
+}
+.welcome-stats span { color: #CBD5E1; margin: 0 10px; }
+
+/* ── Mission header strip ────────────────────────────────────────────────── */
+.cockpit-mission-header {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #2563EB;
+    border-radius: 0 10px 10px 0;
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+}
+.cockpit-mission-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin-bottom: 6px;
+}
+.cockpit-mission-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+.cockpit-mission-goal {
+    font-size: 0.90rem;
+    color: #475569;
+    margin: 0;
+    line-height: 1.50;
+}
+
+/* ── Stage progress pills ────────────────────────────────────────────────── */
+.stage-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 16px 0; }
+.stage-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 16px;
+    font-size: 0.75rem; font-family: monospace; font-weight: 600;
+}
+.stage-pill-done    { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; }
+.stage-pill-pending { background: #F8FAFC; border: 1px solid #E2E8F0; color: #94A3B8; }
+.stage-pill-active  { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1D4ED8; }
+
+/* ── Prompt copy section ─────────────────────────────────────────────────── */
+.prompt-copy-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin-bottom: 6px;
+}
+.prompt-file-tag {
+    font-size: 0.76rem;
+    color: #94A3B8;
+    font-family: monospace;
+    margin-bottom: 10px;
+}
+.prompt-multistage-hint {
+    font-size: 0.82rem;
+    color: #64748B;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+/* ── After-running checklist ─────────────────────────────────────────────── */
+.run-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin: 18px 0 10px 0;
+}
+.run-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; font-size: 0.88rem; color: #334155;
+    line-height: 1.55;
+}
+.run-step-num {
+    min-width: 22px; height: 22px; border-radius: 50%;
+    background: #1E40AF; color: #FFFFFF;
+    font-size: 0.68rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+}
+.run-step code {
+    background: #F1F5F9; color: #1E40AF;
+    padding: 2px 7px; border-radius: 4px;
+    font-size: 0.82rem; font-weight: 600;
+}
+
+/* ── Layer B locked / unlocked ───────────────────────────────────────────── */
+.layer-b-lock {
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 10px;
+    padding: 24px 28px;
+    text-align: center;
+    margin: 4px 0;
+}
+.layer-b-lock-icon  { font-size: 1.2rem; margin-bottom: 6px; color: #CBD5E1; }
+.layer-b-lock-title { font-size: 0.88rem; font-weight: 600; color: #94A3B8; margin-bottom: 4px; }
+.layer-b-lock-hint  { font-size: 0.80rem; color: #CBD5E1; }
+.layer-b-open-label {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #15803D; margin-bottom: 10px;
+}
+
+/* ── Sidebar mission rail ─────────────────────────────────────────────────── */
+.rail-item {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 4px 0;
+}
+.rail-dot-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.rail-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.70rem; font-weight: 700; flex-shrink: 0;
+}
+.rail-line { width: 2px; min-height: 14px; flex-grow: 1; }
+.rail-label { font-size: 0.74rem; line-height: 1.3; padding-top: 5px; }
+
+/* ── Artifact panel ──────────────────────────────────────────────────────── */
+.artifact-panel-label {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #64748B; margin-bottom: 12px;
+}
+.artifact-empty {
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 10px;
+    padding: 32px 24px;
+    text-align: center;
+}
+.artifact-empty-icon  { font-size: 1.6rem; color: #CBD5E1; margin-bottom: 10px; }
+.artifact-empty-title { font-size: 0.88rem; font-weight: 600; color: #94A3B8; margin-bottom: 5px; }
+.artifact-empty-hint  { font-size: 0.80rem; color: #CBD5E1; line-height: 1.55; }
+
+/* ── Completion / unlock card ─────────────────────────────────────────────── */
+.unlock-card {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+}
+.unlock-card-top    { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #15803D; margin-bottom: 4px; }
+.unlock-card-title  { font-size: 0.95rem; font-weight: 600; color: #166534; margin-bottom: 5px; }
+.unlock-card-next   { font-size: 0.84rem; color: #15803D; }
+.unlock-card-next b { color: #14532D; font-weight: 700; }
+
+/* ── Metric snippet card ─────────────────────────────────────────────────── */
+.metric-snippet {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.metric-snippet-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #64748B; margin-bottom: 5px; }
+.metric-snippet-value { font-size: 1.8rem; font-weight: 700; color: #0F172A; letter-spacing: -0.02em; }
+.metric-snippet-sub   { font-size: 0.74rem; color: #94A3B8; margin-top: 3px; }
+
+/* ── All-complete banner ─────────────────────────────────────────────────── */
+.all-done-banner {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 12px;
+    padding: 32px 28px;
+    text-align: center;
+    margin-bottom: 22px;
+}
+.all-done-icon    { font-size: 2.2rem; color: #15803D; margin-bottom: 10px; }
+.all-done-title   { font-size: 1.2rem; font-weight: 700; color: #14532D; margin-bottom: 6px; }
+.all-done-sub     { font-size: 0.92rem; color: #15803D; line-height: 1.55; }
+
+/* ── Mission map card ────────────────────────────────────────────────────── */
+.mmap-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 10px; margin-bottom: 8px;
+}
+.mmap-row.complete { background: #F0FDF4; border: 1px solid #BBF7D0; border-left: 4px solid #22C55E; }
+.mmap-row.current  { background: #FFFFFF; border: 1px solid #BFDBFE; border-left: 4px solid #2563EB;
+                     box-shadow: 0 2px 8px rgba(37,99,235,0.08); }
+.mmap-row.unlocked { background: #FFFFFF; border: 1px solid #E2E8F0; }
+.mmap-row.locked   { background: #F8FAFC; border: 1px solid #F1F5F9; opacity: 0.50; }
+.mmap-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 0.70rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.mmap-dot.complete  { background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; }
+.mmap-dot.current   { background: #DBEAFE; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.mmap-dot.unlocked  { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+.mmap-dot.locked    { background: #F8FAFC; color: #CBD5E1; border: 1px solid #F1F5F9; }
+.mmap-title { font-size: 0.92rem; font-weight: 600; }
+.mmap-title.complete  { color: #166534; }
+.mmap-title.current   { color: #1E40AF; }
+.mmap-title.unlocked  { color: #1E293B; }
+.mmap-title.locked    { color: #94A3B8; }
+.mmap-goal { font-size: 0.82rem; color: #64748B; margin-top: 3px; }
+
+.chip {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 14px;
+    font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    margin-left: auto; flex-shrink: 0;
+}
+.chip-complete { background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; }
+.chip-current  { background: #DBEAFE; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.chip-unlocked { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+.chip-locked   { background: #F8FAFC; color: #CBD5E1; border: 1px solid #F1F5F9; }
+
+/* ── Notification strips ─────────────────────────────────────────────────── */
+.notif {
+    border-radius: 8px; padding: 12px 18px;
+    font-size: 0.88rem; font-weight: 500;
+    margin: 0 0 14px 0; line-height: 1.50;
+}
+.notif code {
+    background: rgba(0,0,0,0.06);
+    padding: 2px 6px; border-radius: 4px; font-size: 0.82rem;
+}
+.notif-warn    { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+.notif-rebuilt { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1D4ED8; }
+.notif-reset   { background: #F8FAFC; border: 1px solid #E2E8F0; color: #64748B; }
+
+</style>
+""", unsafe_allow_html=True)
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -66,11 +610,9 @@ def prompt_text(filename: str) -> str | None:
 
 
 def parse_prompt_layers(content: str) -> dict[str, str]:
-    """Extract Layer A, B, C sections from a structured prompt file."""
     layers: dict[str, str] = {}
     current_key: str | None = None
     current_lines: list[str] = []
-
     for line in content.splitlines():
         m = re.match(r"^## Layer ([ABC])\b", line)
         if m:
@@ -79,24 +621,95 @@ def parse_prompt_layers(content: str) -> dict[str, str]:
             current_key = m.group(1)
             current_lines = []
         elif line.startswith("## ") and current_key:
-            # Hit the next top-level section — close current layer
             layers[current_key] = "\n".join(current_lines).strip()
             current_key = None
             current_lines = []
         elif current_key is not None:
             current_lines.append(line)
-
     if current_key and current_lines:
         layers[current_key] = "\n".join(current_lines).strip()
-
     return layers
+
+
+def extract_prompt_quote(layer_text: str) -> tuple[str, str]:
+    """Split Layer A into (blockquote_to_copy, surrounding_context)."""
+    lines         = layer_text.splitlines()
+    quote_parts: list[str] = []
+    other_parts: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(">"):
+            clean = stripped.lstrip(">").strip()
+            if clean.startswith('"') and clean.endswith('"'):
+                clean = clean[1:-1]
+            if clean:
+                quote_parts.append(clean)
+        else:
+            other_parts.append(line)
+    quote   = "\n".join(quote_parts).strip()
+    context = "\n".join(other_parts).strip()
+    if not quote and context:
+        paras = [p.strip() for p in context.split("\n\n") if p.strip()]
+        if paras:
+            quote   = paras[0]
+            context = "\n\n".join(paras[1:])
+    return quote, context
+
+# ── Student state ─────────────────────────────────────────────────────────────
+
+DEFAULT_STATE: dict = {
+    "current_mission":    0,
+    "completed_missions": [],
+    "unlocked_missions":  [0],
+    "last_checked":       None,
+    "mode":               "guided",
+}
+
+
+def load_student_state() -> dict:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if STATE_PATH.exists():
+        try:
+            data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            for k, v in DEFAULT_STATE.items():
+                if k not in data:
+                    data[k] = v
+            return data
+        except Exception:
+            pass
+    state = dict(DEFAULT_STATE)
+    save_student_state(state)
+    return state
+
+
+def save_student_state(state: dict) -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
+def init_session_state() -> None:
+    if "lab_state" not in st.session_state:
+        st.session_state["lab_state"] = load_student_state()
+    loaded_state = st.session_state["lab_state"]
+    if "entered_lab" not in st.session_state:
+        # Auto-skip welcome if student has already started
+        st.session_state["entered_lab"] = (
+            len(loaded_state["completed_missions"]) > 0 or
+            loaded_state["current_mission"] > 0
+        )
+    if "last_refresh_result" not in st.session_state:
+        st.session_state["last_refresh_result"] = None
+    if "confirm_reset" not in st.session_state:
+        st.session_state["confirm_reset"] = False
+    if "reset_phase" not in st.session_state:
+        st.session_state["reset_phase"] = 0   # 0=idle 1=confirm 2=done
 
 # ── Mission definitions ───────────────────────────────────────────────────────
 
-MISSIONS = [
+MISSIONS: list[dict] = [
     {
         "label": "Mission 0 — Wake the Lab",
-        "goal": "Environment setup and first prompt-driven success.",
+        "goal":  "Environment setup and first prompt-driven success.",
         "purpose": (
             "Verify that the full tool chain — Python, Claude Code, VS Code, and the repo scaffold — "
             "is operational before any scientific work begins."
@@ -110,161 +723,236 @@ MISSIONS = [
             "How Claude Code reads and navigates a research repo; the difference between environment "
             "readiness and data readiness; what the status file format means."
         ),
-        "stages": ["stage_00_bootstrap"],
-        "prompts": ["stage_00_bootstrap.md"],
-        "reports": ["env_check.md"],
+        "stages":   ["stage_00_bootstrap"],
+        "prompts":  ["stage_00_bootstrap.md"],
+        "reports":  ["env_check.md"],
+        "allowed_files":   ["scripts/bootstrap.py", "reports/env_check.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/status/stage_00_bootstrap.json", "reports/env_check.md"],
+        "make_commands":    ["make bootstrap"],
     },
     {
         "label": "Mission 1 — Receive the Signal",
-        "goal": "Fetch the teaching pack and confirm the dataset is ready.",
+        "goal":  "Fetch the teaching pack and confirm the dataset is ready.",
         "purpose": (
             "Download the imaging teaching dataset and verify that it is structurally intact "
             "and ready for analysis."
         ),
         "why_it_matters": (
             "You cannot evaluate a model on data you have not inspected. Receiving and confirming "
-            "data is a data integrity step — not just a download. Silent data corruption is one of "
-            "the most common sources of irreproducible results in medical AI."
+            "data is a data integrity step — not just a download."
         ),
         "student_learns": (
             "What the teaching pack contains; how status files track pipeline progress; "
             "why input validation matters before modeling."
         ),
-        "stages": ["stage_01_fetch_sample"],
-        "prompts": ["stage_01_fetch_sample.md"],
-        "reports": [],
+        "stages":   ["stage_01_fetch_sample"],
+        "prompts":  ["stage_01_fetch_sample.md"],
+        "reports":  [],
+        "allowed_files":   ["scripts/fetch_data.py"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/status/stage_01_fetch_sample.json", "data/sample/  (imaging dataset)"],
+        "make_commands":    ["make fetch-sample"],
     },
     {
         "label": "Mission 2 — Build the First Detector",
-        "goal": "Visualize the data, train the baseline, and record the first metric.",
+        "goal":  "Visualize the data, train the baseline, and record the first metric.",
         "purpose": (
             "Load the dataset, produce the first visual artifact, and run the smallest deterministic "
             "baseline model to establish a reproducible starting point."
         ),
         "why_it_matters": (
             "Every later comparison depends on this baseline being correct and reproducible. "
-            "A poorly understood baseline makes all subsequent improvements uninterpretable. "
             "The goal is not a high Dice score — it is a score you can explain."
         ),
         "student_learns": (
-            "What Dice score means in practice; what 'baseline' means in research (a reference, not a target); "
-            "how to interpret a loss curve; how visualization can reveal data quality issues before training."
+            "What Dice score means in practice; what 'baseline' means in research; "
+            "how to interpret a loss curve."
         ),
-        "stages": ["stage_02_load_visualize", "stage_03_train_baseline"],
-        "prompts": ["stage_02_load_visualize.md", "stage_03_train_baseline.md"],
-        "reports": ["data_notes.md", "train_notes.md"],
+        "stages":   ["stage_02_load_visualize", "stage_03_train_baseline"],
+        "prompts":  ["stage_02_load_visualize.md", "stage_03_train_baseline.md"],
+        "reports":  ["data_notes.md", "train_notes.md"],
+        "allowed_files":   ["scripts/visualize_sample.py", "scripts/run_train.py", "reports/data_notes.md", "reports/train_notes.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/figures/sample_overlay.png", "outputs/figures/loss_curve.png", "outputs/metrics/val_metrics.json", "outputs/status/stage_02_load_visualize.json", "outputs/status/stage_03_train_baseline.json"],
+        "make_commands":    ["make visualize", "make smoke-train"],
     },
     {
         "label": "Mission 3 — Investigate Failure",
-        "goal": "Identify best and worst predictions and form a failure hypothesis.",
+        "goal":  "Identify best and worst predictions and form a failure hypothesis.",
         "purpose": (
-            "Analyse where and why the baseline fails — slice by slice, error type by error type — "
+            "Analyse where and why the baseline fails — slice by slice — "
             "and produce a written hypothesis about the dominant failure mode."
         ),
         "why_it_matters": (
             "Blind improvement without error understanding is engineering guesswork, not science. "
-            "The hypothesis you write here determines whether Mission 4 is a valid controlled experiment "
-            "or an arbitrary change."
+            "The hypothesis you write here determines whether Mission 4 is a valid controlled experiment."
         ),
         "student_learns": (
-            "How to read TP/FP/FN error maps; the difference between best-case and worst-case Dice; "
-            "how to form a testable hypothesis from observational data; why a failure pattern matters "
-            "more than the average metric."
+            "How to read TP/FP/FN error maps; how to form a testable hypothesis from observational data."
         ),
-        "stages": ["stage_04_error_analysis"],
-        "prompts": ["stage_04_error_analysis.md"],
-        "reports": ["error_analysis.md"],
+        "stages":   ["stage_04_error_analysis"],
+        "prompts":  ["stage_04_error_analysis.md"],
+        "reports":  ["error_analysis.md"],
+        "allowed_files":   ["scripts/error_analysis.py", "reports/error_analysis.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/figures/error_analysis_best.png", "outputs/figures/error_analysis_worst.png", "outputs/status/stage_04_error_analysis.json", "reports/error_analysis.md"],
+        "make_commands":    ["make error-analysis"],
     },
     {
         "label": "Mission 4 — Improve With Intent",
-        "goal": "Make one controlled improvement, compare results, and pack the Day 1 summary.",
+        "goal":  "Make one controlled improvement, compare results, pack the Day 1 summary.",
         "purpose": (
             "Test one specific, well-motivated change to the baseline and measure the result "
-            "with the same metric. Then assemble all Day 1 findings into a summary deliverable."
+            "with the same metric. Assemble all Day 1 findings into a summary deliverable."
         ),
         "why_it_matters": (
             "One controlled change with honest reporting is more scientifically valuable than multiple "
-            "unjustified tweaks. You learn whether your Mission 3 hypothesis was correct — and that "
-            "finding, positive or negative, is the scientific contribution of Day 1."
+            "unjustified tweaks."
         ),
         "student_learns": (
-            "What a controlled experiment means in a machine learning context; how to compare two "
-            "pipelines fairly; that negative results are valid scientific results; how to assemble "
-            "a research summary that honestly represents its findings."
+            "What a controlled experiment means in ML; how to compare two pipelines fairly; "
+            "that negative results are valid scientific results."
         ),
-        "stages": ["stage_05_model_swap", "stage_06_pack_report"],
-        "prompts": ["stage_05_model_swap.md", "stage_06_pack_report.md"],
-        "reports": ["model_swap.md", "day1_summary.md"],
+        "stages":   ["stage_05_model_swap", "stage_06_pack_report"],
+        "prompts":  ["stage_05_model_swap.md", "stage_06_pack_report.md"],
+        "reports":  ["model_swap.md", "day1_summary.md"],
+        "allowed_files":   ["scripts/model_swap.py", "scripts/pack_report.py", "reports/model_swap.md", "reports/day1_summary.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/metrics/model_swap_comparison.json", "outputs/figures/model_swap_comparison.png", "outputs/status/stage_05_model_swap.json", "reports/model_swap.md", "reports/day1_summary.md", "outputs/status/stage_06_pack_report.json"],
+        "make_commands":    ["make model-swap", "make pack-report"],
     },
     {
         "label": "Mission 5 — Design the Next Study",
-        "goal": "Write a Day 2 challenge plan, then implement and measure it.",
+        "goal":  "Write a Day 2 challenge plan, then implement and measure it.",
         "purpose": (
-            "Before writing any code, produce a concrete written plan for the Day 2 challenge. "
-            "Then implement the planned adaptation and measure the outcome against Day 1."
+            "Before writing any code, produce a written plan for the Day 2 challenge. "
+            "Then implement the adaptation and measure the outcome against Day 1."
         ),
         "why_it_matters": (
             "Research planning is a distinct skill from execution. A written plan forces clarity "
-            "about what you believe and why before you commit to any implementation. "
-            "It also makes it possible to report honestly when the outcome differs from the prediction."
+            "about what you believe before you commit to implementation."
         ),
         "student_learns": (
-            "How to translate error observations into a testable strategy; how Otsu's method differs "
-            "from fixed thresholding; how to design a fair before/after comparison; "
+            "How to translate error observations into a testable strategy; "
             "how to report an outcome that differs from the plan."
         ),
-        "stages": ["stage_07_challenge_plan", "stage_08_adapt_pipeline"],
-        "prompts": ["stage_07_challenge_plan.md", "stage_08_adapt_pipeline.md"],
-        "reports": ["challenge_plan.md", "adapt_pipeline.md"],
+        "stages":   ["stage_07_challenge_plan", "stage_08_adapt_pipeline"],
+        "prompts":  ["stage_07_challenge_plan.md", "stage_08_adapt_pipeline.md"],
+        "reports":  ["challenge_plan.md", "adapt_pipeline.md"],
+        "allowed_files":   ["scripts/challenge_plan.py", "scripts/adapt_pipeline.py", "reports/challenge_plan.md", "reports/adapt_pipeline.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/status/stage_07_challenge_plan.json", "reports/challenge_plan.md", "outputs/metrics/challenge_comparison.json", "outputs/figures/challenge_comparison.png", "outputs/status/stage_08_adapt_pipeline.json", "reports/adapt_pipeline.md"],
+        "make_commands":    ["make challenge-plan", "make adapt-pipeline"],
     },
     {
         "label": "Mission 6 — Translate Responsibly",
-        "goal": "Reflect on clinical implications and write the translation memo.",
+        "goal":  "Reflect on clinical implications and write the translation memo.",
         "purpose": (
-            "Locate the prototype honestly on the path from a toy pipeline to a research contribution "
-            "to a clinical tool. Produce a written memo that a non-technical clinical collaborator "
-            "could read and act on."
+            "Locate the prototype honestly on the path from a toy pipeline to a research contribution. "
+            "Produce a written memo a clinical collaborator could read."
         ),
         "why_it_matters": (
             "Overstating prototype capabilities in clinical AI can cause direct patient harm. "
-            "This is the most important writing exercise of the lab. The memo is grounded in actual "
-            "results — including disappointing ones — not in best-case interpretation."
+            "This is the most important writing exercise of the lab."
         ),
         "student_learns": (
-            "The gap between in-sample performance and clinical validity; what regulatory pathways "
-            "(MDR, FDA 510(k)) require before a tool can be used clinically; what 'key limitation' "
-            "means to a clinical collaborator versus to a benchmark paper."
+            "The gap between in-sample performance and clinical validity; "
+            "what regulatory pathways require before clinical deployment."
         ),
-        "stages": ["stage_09_translation_memo"],
-        "prompts": ["stage_09_translation_memo.md"],
-        "reports": ["translation_memo.md"],
+        "stages":   ["stage_09_translation_memo"],
+        "prompts":  ["stage_09_translation_memo.md"],
+        "reports":  ["translation_memo.md"],
+        "allowed_files":   ["scripts/translation_memo.py", "reports/translation_memo.md"],
+        "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
+        "expected_outputs": ["outputs/status/stage_09_translation_memo.json", "reports/translation_memo.md"],
+        "make_commands":    ["make translation-memo"],
     },
 ]
 
+# Artifact preview hints per mission index
+MISSION_PREVIEW: dict[int, dict] = {
+    0: {"figure": None,                        "metric": None,                                                            "status_stage": "stage_00_bootstrap"},
+    1: {"figure": None,                        "metric": None,                                                            "status_stage": "stage_01_fetch_sample"},
+    2: {"figure": "sample_overlay.png",        "metric": ("val_metrics.json",           "dice",     "Baseline Dice"),    "status_stage": None},
+    3: {"figure": "error_analysis_best.png",   "metric": None,                                                            "status_stage": None},
+    4: {"figure": "model_swap_comparison.png", "metric": ("model_swap_comparison.json", "new_dice", "Model Swap Dice"),  "status_stage": None},
+    5: {"figure": "challenge_comparison.png",  "metric": ("challenge_comparison.json",  "new_dice", "Day 2 Dice"),       "status_stage": None},
+    6: {"figure": None,                        "metric": None,                                                            "status_stage": "stage_09_translation_memo", "report": "translation_memo.md"},
+}
 
-def mission_status(mission: dict) -> str:
-    stages = mission["stages"]
-    n_ok = sum(1 for s in stages if stage_ok(s))
-    if n_ok == 0:
-        return "not started"
-    if n_ok == len(stages):
+# ── Mission progression helpers ───────────────────────────────────────────────
+
+def mission_stages_complete(idx: int) -> bool:
+    return all(stage_ok(s) for s in MISSIONS[idx]["stages"])
+
+
+def get_mission_display_status(idx: int, state: dict) -> str:
+    if idx in state["completed_missions"]:
         return "complete"
-    return "in progress"
+    if idx == state["current_mission"]:
+        return "current"
+    if idx in state["unlocked_missions"]:
+        return "unlocked"
+    return "locked"
 
 
-STATUS_ICON = {
-    "complete":    "🟢",
-    "in progress": "🟡",
-    "not started": "⚪",
-}
+def get_active_stage_idx(mission: dict) -> int:
+    """Return index of first incomplete stage, or last if all complete."""
+    for i, stage in enumerate(mission["stages"]):
+        if not stage_ok(stage):
+            return i
+    return len(mission["stages"]) - 1
 
-STATUS_LABEL = {
-    "complete":    "Complete",
-    "in progress": "In progress",
-    "not started": "Not started",
-}
 
-# ── Required artifacts for Evaluation tab ────────────────────────────────────
+def rebuild_state_from_artifacts() -> dict:
+    completed: list[int] = []
+    unlocked:  list[int] = [0]
+    current = 0
+    all_done = True
+    for i in range(len(MISSIONS)):
+        if mission_stages_complete(i):
+            if i not in completed:
+                completed.append(i)
+            nxt = i + 1
+            if nxt < len(MISSIONS) and nxt not in unlocked:
+                unlocked.append(nxt)
+        else:
+            current = i
+            all_done = False
+            break
+    if all_done:
+        current = len(MISSIONS) - 1
+    return {
+        "current_mission":    current,
+        "completed_missions": completed,
+        "unlocked_missions":  unlocked,
+        "last_checked":       datetime.now(timezone.utc).isoformat(),
+        "mode":               "guided",
+    }
+
+
+def do_refresh_current_mission(state: dict) -> tuple[dict, str]:
+    idx     = min(state["current_mission"], len(MISSIONS) - 1)
+    mission = MISSIONS[idx]
+    state   = dict(state)
+    state["last_checked"] = datetime.now(timezone.utc).isoformat()
+    if mission_stages_complete(idx):
+        if idx not in state["completed_missions"]:
+            state["completed_missions"] = state["completed_missions"] + [idx]
+        nxt = idx + 1
+        if nxt < len(MISSIONS):
+            if nxt not in state["unlocked_missions"]:
+                state["unlocked_missions"] = state["unlocked_missions"] + [nxt]
+            state["current_mission"] = nxt
+            return state, f"complete:{mission['label']}|unlock:{MISSIONS[nxt]['label']}"
+        else:
+            return state, f"allcomplete:{mission['label']}"
+    else:
+        missing = [s for s in mission["stages"] if not stage_ok(s)]
+        return state, "missing:" + ",".join(missing)
+
+# ── Required artifacts (Evaluation tab) ──────────────────────────────────────
 
 REQUIRED_STATUS = [
     ("stage_00_bootstrap.json",        "Mission 0"),
@@ -278,7 +966,6 @@ REQUIRED_STATUS = [
     ("stage_08_adapt_pipeline.json",   "Mission 5"),
     ("stage_09_translation_memo.json", "Mission 6"),
 ]
-
 REQUIRED_FIGURES = [
     ("sample_overlay.png",        "Mission 2"),
     ("loss_curve.png",            "Mission 2"),
@@ -287,130 +974,787 @@ REQUIRED_FIGURES = [
     ("model_swap_comparison.png", "Mission 4"),
     ("challenge_comparison.png",  "Mission 5"),
 ]
-
 REQUIRED_METRICS = [
     ("val_metrics.json",           "Mission 2"),
     ("model_swap_comparison.json", "Mission 4"),
     ("challenge_comparison.json",  "Mission 5"),
 ]
-
 REQUIRED_REPORTS = [
-    ("env_check.md",       "Mission 0"),
-    ("data_notes.md",      "Mission 2"),
-    ("train_notes.md",     "Mission 2"),
-    ("error_analysis.md",  "Mission 3"),
-    ("model_swap.md",      "Mission 4"),
-    ("day1_summary.md",    "Mission 4"),
-    ("challenge_plan.md",  "Mission 5"),
-    ("adapt_pipeline.md",  "Mission 5"),
-    ("translation_memo.md","Mission 6"),
+    ("env_check.md",        "Mission 0"),
+    ("data_notes.md",       "Mission 2"),
+    ("train_notes.md",      "Mission 2"),
+    ("error_analysis.md",   "Mission 3"),
+    ("model_swap.md",       "Mission 4"),
+    ("day1_summary.md",     "Mission 4"),
+    ("challenge_plan.md",   "Mission 5"),
+    ("adapt_pipeline.md",   "Mission 5"),
+    ("translation_memo.md", "Mission 6"),
 ]
 
-# ── Header ────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHIVE / RESET HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-st.title("Medical AI + Agentic Coding Lab")
-st.caption(
-    "**Mission dashboard** — navigation, artifact inspection, and submission readiness.  "
-    "Claude interaction happens in **VS Code + Claude Code**, not here."
-)
-st.divider()
+# Files in reports/ that are student-generated runtime artifacts (safe to clear)
+_GENERATED_REPORTS = [
+    "env_check.md", "data_notes.md", "train_notes.md", "error_analysis.md",
+    "model_swap.md", "day1_summary.md", "challenge_plan.md",
+    "adapt_pipeline.md", "translation_memo.md",
+]
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
+# Subdirectory names under outputs/ to clear on reset
+_OUTPUT_SUBDIRS = ["status", "figures", "metrics"]
 
-tab_map, tab_results, tab_reports, tab_eval, tab_prompts = st.tabs([
-    "🗺️  Mission Map",
-    "📊  Results",
-    "📄  Reports",
-    "✅  Evaluation",
-    "💬  Prompt Studio",
-])
 
-# ── Tab 1: Mission Map ────────────────────────────────────────────────────────
+def archive_current_session(state: dict) -> Path:
+    """
+    Write a timestamped snapshot of the current session state to
+    .session_archives/. Returns the archive file path.
+    This is a read-only metadata snapshot — no files are moved or deleted.
+    """
+    archive_dir = BASE / ".session_archives"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    archive_path = archive_dir / f"session_{ts}.json"
 
-with tab_map:
-    st.subheader("Mission Map")
-    st.write(
-        "Your research journey through the lab. Complete missions in order. "
-        "Each mission produces artifacts you can inspect in the other tabs."
+    n_complete = len(state.get("completed_missions", []))
+    snapshot = {
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "missions_completed": n_complete,
+        "current_mission": state.get("current_mission", 0),
+        "completed_missions": state.get("completed_missions", []),
+        "student_state_snapshot": state,
+        "artifacts_present": {
+            "status_files":  [p.name for p in sorted((BASE / "outputs" / "status").glob("*.json")) if p.exists()],
+            "figures":       [p.name for p in sorted((BASE / "outputs" / "figures").glob("*.png")) if p.exists()],
+            "metric_files":  [p.name for p in sorted((BASE / "outputs" / "metrics").glob("*.json")) if p.exists()],
+            "reports":       [r for r in _GENERATED_REPORTS if (BASE / "reports" / r).exists()],
+        },
+    }
+    archive_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+    return archive_path
+
+
+def do_full_reset(state: dict) -> dict:
+    """
+    Safe reset: archive current session state, then clear all student-generated
+    runtime outputs. Does NOT touch scaffold, scripts, tests, prompts, or docs.
+    Returns the fresh DEFAULT_STATE dict.
+    """
+    # 1. Archive first
+    archive_current_session(state)
+
+    # 2. Clear output subdirectories (keep the directories themselves)
+    for subdir in _OUTPUT_SUBDIRS:
+        d = BASE / "outputs" / subdir
+        if d.exists():
+            for f in d.iterdir():
+                if f.is_file():
+                    f.unlink()
+
+    # 3. Clear generated report files
+    for fname in _GENERATED_REPORTS:
+        p = BASE / "reports" / fname
+        if p.exists():
+            p.unlink()
+
+    # 4. Clear fetched imaging data (student must re-run Mission 1)
+    imaging_dir = BASE / "data" / "sample" / "imaging"
+    if imaging_dir.exists():
+        for f in imaging_dir.iterdir():
+            if f.is_file():
+                f.unlink()
+
+    # 5. Clear lab history if present
+    lab_history = BASE / ".lab_history"
+    if lab_history.exists():
+        import shutil
+        shutil.rmtree(lab_history, ignore_errors=True)
+
+    # 6. Write fresh state
+    fresh = dict(DEFAULT_STATE)
+    save_student_state(fresh)
+    return fresh
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI RENDERING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def render_sidebar_rail(state: dict) -> None:
+    """Vertical mission progress rail in the sidebar."""
+    for i, m in enumerate(MISSIONS):
+        disp    = get_mission_display_status(i, state)
+        parts   = m["label"].split("—")
+        short   = parts[1].strip()[:20] if len(parts) > 1 else f"M{i}"
+        is_last = (i == len(MISSIONS) - 1)
+
+        if disp == "complete":
+            dot_bg, dot_bd, dot_fg = "#14532D", "#166534", "#4ADE80"
+            line_col, text_col     = "#1A3B28", "#6EE7B7"
+            icon = "&#10003;"
+        elif disp == "current":
+            dot_bg, dot_bd, dot_fg = "#1E3A8A", "#2563EB", "#93C5FD"
+            line_col, text_col     = "#1E3058", "#BFDBFE"
+            icon = str(i)
+        elif disp == "unlocked":
+            dot_bg, dot_bd, dot_fg = "#1E293B", "#334155", "#64748B"
+            line_col, text_col     = "#1E293B", "#475569"
+            icon = str(i)
+        else:
+            dot_bg, dot_bd, dot_fg = "#0F172A", "#1E293B", "#334155"
+            line_col, text_col     = "#0F172A", "#334155"
+            icon = str(i)
+
+        fw = "font-weight:600;" if disp == "current" else ""
+        # Build connector as inline element to avoid blank-line breaks in Markdown parser
+        conn = (
+            f'<div style="width:2px;height:12px;background:{line_col};margin:2px auto 0 auto;border-radius:1px"></div>'
+            if not is_last else ""
+        )
+        # Single-line HTML — no internal newlines, avoids Streamlit markdown parser breaking on blank lines
+        html = (
+            f'<div style="display:flex;align-items:flex-start;gap:9px;padding:2px 0">'
+            f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">'
+            f'<div style="width:26px;height:26px;border-radius:50%;background:{dot_bg};border:1px solid {dot_bd};display:flex;align-items:center;justify-content:center;color:{dot_fg};font-size:0.68rem;font-weight:700">{icon}</div>'
+            f'{conn}'
+            f'</div>'
+            f'<div style="font-size:0.78rem;color:{text_col};line-height:1.3;padding-top:5px;{fw}">{short}</div>'
+            f'</div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+
+def render_welcome_screen() -> None:
+    """Full-screen welcome / onboarding."""
+    st.markdown(
+        """<div class="welcome-wrap">
+          <div class="welcome-eyebrow">Medical AI + Agentic Coding Lab — Summer Session</div>
+          <div class="welcome-title">Begin your<br>research mission sequence.</div>
+          <div class="welcome-sub">
+            You are a junior clinical AI investigator.<br>
+            Over seven missions you will build, evaluate, and translate a medical image
+            segmentation prototype — using AI-assisted research methods throughout.
+          </div>
+        </div>""",
+        unsafe_allow_html=True,
     )
+
+    c1, c2, c3 = st.columns(3)
+    roles = [
+        ("You operate",     "VS Code + Claude Code",
+         "You direct the research. You copy prompts, judge outputs, and advance missions. "
+         "Claude executes under your direction."),
+        ("Claude builds",   "Code · Artifacts · Reports",
+         "Claude writes scripts, runs analyses, generates figures and metrics, and drafts "
+         "written summaries. You review and guide."),
+        ("Dashboard shows", "Progress · Prompts · Results",
+         "This console shows your current mission, the prompts to run, your artifacts, "
+         "and whether you are ready to submit."),
+    ]
+    for col, (eyebrow, title, body) in zip([c1, c2, c3], roles):
+        with col:
+            st.markdown(
+                f"""<div class="welcome-role-card">
+                  <div class="welcome-role-eyebrow">{eyebrow}</div>
+                  <div class="welcome-role-title">{title}</div>
+                  <div class="welcome-role-body">{body}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown(
+        '<div class="welcome-stats">'
+        '7 missions<span>·</span>2 research days<span>·</span>'
+        'real FLAIR imaging data<span>·</span>real metrics'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    _, cta, _ = st.columns([0.32, 0.36, 0.32])
+    with cta:
+        if st.button("Enter Lab Studio  →", type="primary", use_container_width=True):
+            st.session_state["entered_lab"] = True
+            st.rerun()
     st.write("")
 
-    completed_count = 0
-    for mission in MISSIONS:
-        status = mission_status(mission)
-        if status == "complete":
-            completed_count += 1
-        icon = STATUS_ICON[status]
-        status_label = STATUS_LABEL[status]
 
-        # Mission card header row
-        col_icon, col_header, col_badge = st.columns([0.04, 0.72, 0.20])
-        with col_icon:
-            st.write(icon)
-        with col_header:
-            st.markdown(f"**{mission['label']}**")
-            st.caption(mission["goal"])
-        with col_badge:
-            st.write(status_label)
+def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
+    """Center panel: mission header + one-step prompt + run checklist + Layer B."""
 
-        # Mission framing and stage detail in expander
-        with st.expander("Mission context + stage detail", expanded=False):
-            st.markdown(f"**Scientific purpose:** {mission['purpose']}")
-            st.markdown(f"**Why it matters:** {mission['why_it_matters']}")
-            st.markdown(f"**What you are learning:** {mission['student_learns']}")
-            st.write("")
-            st.markdown("**Stage completion:**")
-            for stage in mission["stages"]:
-                ok = stage_ok(stage)
-                tick = "✓" if ok else "○"
-                st.write(f"{tick}  `{stage}.json`")
+    # ── Mission header ─────────────────────────────────────────────────────
+    parts   = mission["label"].split("—")
+    m_num   = parts[0].strip()
+    m_title = parts[1].strip() if len(parts) > 1 else mission["label"]
+
+    st.markdown(
+        f"""<div class="cockpit-mission-header">
+          <div class="cockpit-mission-eyebrow">Current Mission · {m_num}</div>
+          <div class="cockpit-mission-title">{m_title}</div>
+          <div class="cockpit-mission-goal">{mission['goal']}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    # ── Stage pills ─────────────────────────────────────────────────────────
+    pills = ""
+    active_si = get_active_stage_idx(mission)
+    for si, s in enumerate(mission["stages"]):
+        ok  = stage_ok(s)
+        cls = "stage-pill-done" if ok else ("stage-pill-active" if si == active_si else "stage-pill-pending")
+        mk  = "✓" if ok else ("→" if si == active_si else "○")
+        pills += f'<span class="stage-pill {cls}">{mk}&nbsp;{s}</span>'
+    st.markdown(f'<div class="stage-pills">{pills}</div>', unsafe_allow_html=True)
+
+    # ── Active stage prompt ─────────────────────────────────────────────────
+    pfile    = mission["prompts"][active_si]
+    make_cmd = mission["make_commands"][active_si] if active_si < len(mission["make_commands"]) else None
+    content  = prompt_text(pfile)
+
+    n_stages = len(mission["stages"])
+    if n_stages > 1:
+        completed_stages = sum(1 for s in mission["stages"] if stage_ok(s))
+        st.markdown(
+            f'<div class="prompt-multistage-hint">'
+            f'Stage {active_si + 1} of {n_stages} &nbsp;·&nbsp; {completed_stages} complete</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        f'<div class="prompt-copy-label">Copy this into Claude Code</div>'
+        f'<div class="prompt-file-tag">{pfile}</div>',
+        unsafe_allow_html=True,
+    )
+
+    if content:
+        layers = parse_prompt_layers(content)
+        layer_a = layers.get("A", content)
+        quote, ctx = extract_prompt_quote(layer_a)
+        if quote:
+            st.code(quote, language=None)
+            if ctx:
+                with st.expander("Full prompt context", expanded=False):
+                    st.markdown(ctx)
+        else:
+            st.code(layer_a[:600] + ("..." if len(layer_a) > 600 else ""), language=None)
+    else:
+        st.warning(f"`prompts/{pfile}` not found.")
+
+    # ── After-running checklist ─────────────────────────────────────────────
+    cmd_str = f"<code>{make_cmd}</code>" if make_cmd else "the verification command"
+    run_steps = [
+        "Open VS Code in this repo and start Claude Code: type <code>claude</code>.",
+        "Paste the prompt above. Press Enter and let Claude run.",
+        f"When done, verify: {cmd_str} — check for errors.",
+        "Return here → click <b>Refresh</b> in the sidebar to confirm completion.",
+    ]
+    steps_html = "".join(
+        f'<div class="run-step">'
+        f'<div class="run-step-num">{n}</div>'
+        f'<div>{s}</div></div>'
+        for n, s in enumerate(run_steps, 1)
+    )
+    st.markdown(
+        f'<div class="run-section-label">After running</div>{steps_html}',
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    # ── Layer B — Reflection ────────────────────────────────────────────────
+    mission_done = cur_idx in state["completed_missions"]
+
+    if not mission_done:
+        st.markdown(
+            """<div class="layer-b-lock">
+              <div class="layer-b-lock-icon">🔒</div>
+              <div class="layer-b-lock-title">Reflection prompt locked</div>
+              <div class="layer-b-lock-hint">Complete this mission, then refresh to unlock.</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown('<div class="layer-b-open-label">Layer B — Reflection prompt</div>', unsafe_allow_html=True)
+        for pf in mission["prompts"]:
+            c = prompt_text(pf)
+            if c:
+                layers = parse_prompt_layers(c)
+                if "B" in layers:
+                    with st.container(border=True):
+                        st.markdown(layers["B"])
+
+    # ── Deep context (collapsed) ────────────────────────────────────────────
+    with st.expander("Scientific context — purpose, why it matters, learning objectives", expanded=False):
+        st.markdown(f"**Purpose:** {mission['purpose']}")
+        st.write("")
+        st.markdown(f"**Why it matters:** {mission['why_it_matters']}")
+        st.write("")
+        st.markdown(f"**What you are learning:** {mission['student_learns']}")
+
+    # ── Layer C (collapsed) ─────────────────────────────────────────────────
+    all_c: list[str] = []
+    for pf in mission["prompts"]:
+        c = prompt_text(pf)
+        if c:
+            layers = parse_prompt_layers(c)
+            if "C" in layers:
+                all_c.append(layers["C"])
+    if all_c:
+        with st.expander("Layer C — Customization (optional extension)", expanded=False):
+            for c_text in all_c:
+                st.markdown(c_text)
+
+
+def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> None:
+    """Right panel: completion feedback + artifact preview + stage status."""
+    mission  = MISSIONS[cur_idx]
+    preview  = MISSION_PREVIEW.get(cur_idx, {})
+
+    # ── Completion / unlock card ─────────────────────────────────────────────
+    if result_code and result_code.startswith("complete:"):
+        parts    = result_code[len("complete:"):].split("|unlock:")
+        comp_lbl = parts[0]
+        unl_lbl  = parts[1] if len(parts) > 1 else ""
+        st.markdown(
+            f"""<div class="unlock-card">
+              <div class="unlock-card-top">Mission complete</div>
+              <div class="unlock-card-title">{comp_lbl}</div>
+              {"<div class='unlock-card-next'>Unlocked → <b>" + unl_lbl + "</b></div>" if unl_lbl else ""}
+            </div>""",
+            unsafe_allow_html=True,
+        )
+    elif result_code and result_code.startswith("allcomplete:"):
+        st.markdown(
+            """<div class="all-done-banner">
+              <div class="all-done-icon">✓</div>
+              <div class="all-done-title">Lab complete</div>
+              <div class="all-done-sub">All missions finished.<br>Push to submit.</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    # ── Artifact preview ─────────────────────────────────────────────────────
+    st.markdown('<div class="artifact-panel-label">Artifacts</div>', unsafe_allow_html=True)
+
+    fig_file    = preview.get("figure")
+    metric_info = preview.get("metric")         # (filename, key, label)
+    stat_stage  = preview.get("status_stage")
+    report_file = preview.get("report")
+
+    has_content = False
+
+    # Figure
+    if fig_file and fig_exists(fig_file):
+        st.image(
+            str(BASE / "outputs" / "figures" / fig_file),
+            use_container_width=True,
+        )
+        has_content = True
+
+    # Metric card
+    if metric_info:
+        mfile, mkey, mlabel = metric_info
+        data = load_json(BASE / "outputs" / "metrics" / mfile)
+        if data and mkey in data:
+            val = data[mkey]
+            val_str = f"{val:.3f}" if isinstance(val, float) else str(val)
+            st.markdown(
+                f"""<div class="metric-snippet">
+                  <div class="metric-snippet-label">{mlabel}</div>
+                  <div class="metric-snippet-value">{val_str}</div>
+                  <div class="metric-snippet-sub">{mfile}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            has_content = True
+
+    # Status JSON (missions 0, 1)
+    if stat_stage and stage_ok(stat_stage):
+        data = load_json(BASE / "outputs" / "status" / f"{stat_stage}.json")
+        if data:
+            has_content = True
+            with st.expander("Status file", expanded=True):
+                st.json({k: v for k, v in list(data.items())[:6]})
+
+    # Report excerpt (mission 6)
+    if report_file:
+        content = report_text(report_file)
+        if content and content.strip():
+            has_content = True
+            with st.expander("Report excerpt", expanded=True):
+                st.markdown(content[:500] + ("…" if len(content) > 500 else ""))
+
+    # Empty state
+    if not has_content:
+        st.markdown(
+            """<div class="artifact-empty">
+              <div class="artifact-empty-icon">○</div>
+              <div class="artifact-empty-title">No artifacts yet</div>
+              <div class="artifact-empty-hint">
+                Run the prompt in VS Code + Claude Code,<br>
+                then click Refresh to check for outputs.
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # ── Stage status ─────────────────────────────────────────────────────────
+    st.markdown('<div class="artifact-panel-label">Stage status</div>', unsafe_allow_html=True)
+    for s in mission["stages"]:
+        ok    = stage_ok(s)
+        color = "#15803D" if ok else "#94A3B8"
+        bg    = "#F0FDF4" if ok else "#F8FAFC"
+        bd    = "#BBF7D0" if ok else "#E2E8F0"
+        mark  = "✓" if ok else "○"
+        st.markdown(
+            f'<div style="font-size:0.80rem;font-family:monospace;color:{color};'
+            f'background:{bg};border:1px solid {bd};border-radius:5px;'
+            f'padding:4px 10px;margin-bottom:5px">{mark}&nbsp;{s}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── File constraints (collapsed) ─────────────────────────────────────────
+    with st.expander("Allowed / protected files", expanded=False):
+        st.markdown("**Allowed to edit**")
+        for f in mission["allowed_files"]:
+            st.markdown(
+                f'<span style="font-size:0.80rem;font-family:monospace;'
+                f'color:#15803D;background:#F0FDF4;border-radius:3px;'
+                f'padding:1px 5px">• {f}</span>',
+                unsafe_allow_html=True,
+            )
+        st.write("")
+        st.markdown("**Protected**")
+        for f in mission["protected_files"]:
+            st.markdown(
+                f'<span style="font-size:0.80rem;font-family:monospace;'
+                f'color:#B91C1C;background:#FEF2F2;border-radius:3px;'
+                f'padding:1px 5px">• {f}</span>',
+                unsafe_allow_html=True,
+            )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BOOTSTRAP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+init_session_state()
+inject_css()
+state: dict = st.session_state["lab_state"]
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+
+with st.sidebar:
+    n_complete = len(state["completed_missions"])
+    n_total    = len(MISSIONS)
+
+    # ── Lab header + progress bar ─────────────────────────────────────────────
+    pct = int(n_complete / n_total * 100)
+    st.markdown(
+        f'<div style="padding:8px 0 14px 0">'
+        f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.20em;text-transform:uppercase;color:#4A6A8A;margin-bottom:4px">Medical AI Lab</div>'
+        f'<div style="font-size:0.95rem;font-weight:700;color:#B0CCE8;margin-bottom:16px;letter-spacing:-0.01em">Mission Console</div>'
+        f'<div style="background:#1E293B;border-radius:4px;height:5px;margin-bottom:8px;overflow:hidden">'
+        f'<div style="background:linear-gradient(90deg,#1E40AF,#3B82F6);height:100%;width:{pct}%;border-radius:4px;transition:width 0.5s ease"></div>'
+        f'</div>'
+        f'<div style="font-size:0.74rem;color:#4A7A9A;font-weight:500">{n_complete} of {n_total} missions complete</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    if state["last_checked"]:
+        try:
+            ts = datetime.fromisoformat(state["last_checked"])
+            st.markdown(
+                f'<div style="font-size:0.68rem;color:#334455;margin-bottom:10px">Last checked {ts.strftime("%Y-%m-%d %H:%M")} UTC</div>',
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            pass
+
+    st.divider()
+
+    # ── PRIMARY ACTION — used after every mission ─────────────────────────────
+    st.markdown(
+        '<div style="font-size:0.68rem;color:#4A7A9A;margin-bottom:6px;line-height:1.45">'
+        'After finishing a mission in VS Code + Claude Code, click here to record your progress.</div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("✓  I finished — check my progress", use_container_width=True, type="primary"):
+        new_state, result_code = do_refresh_current_mission(state)
+        save_student_state(new_state)
+        st.session_state["lab_state"]           = new_state
+        st.session_state["last_refresh_result"] = result_code
+        st.session_state["reset_phase"]         = 0
+        st.rerun()
+
+    st.divider()
+
+    # ── ADVANCED TOOLS (collapsed by default) ────────────────────────────────
+    with st.expander("Advanced tools", expanded=False):
+        st.markdown(
+            '<div style="font-size:0.74rem;color:#4A7A9A;margin-bottom:10px;line-height:1.5">'
+            'These tools are for recovery only. You do not need them for normal lab work.</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Rebuild
+        st.markdown(
+            '<div style="font-size:0.72rem;color:#334455;font-weight:600;margin-bottom:3px">Rebuild progress from files on disk</div>'
+            '<div style="font-size:0.70rem;color:#334455;margin-bottom:6px;line-height:1.4">'
+            'Use if the dashboard lost track of which missions you completed.</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Rebuild from saved artifacts", use_container_width=True):
+            new_state = rebuild_state_from_artifacts()
+            save_student_state(new_state)
+            st.session_state["lab_state"]           = new_state
+            n_det = len(new_state["completed_missions"])
+            st.session_state["last_refresh_result"] = f"rebuilt:{n_det}"
+            st.session_state["reset_phase"]         = 0
+            st.rerun()
 
         st.write("")
 
-    st.divider()
-    st.metric("Missions complete", f"{completed_count} / {len(MISSIONS)}")
+        # Archive + full reset — 3-phase confirmation
+        st.markdown(
+            '<div style="font-size:0.72rem;color:#7A3A2A;font-weight:600;margin-bottom:3px">Archive and reset to Mission 0</div>'
+            '<div style="font-size:0.70rem;color:#6A3020;margin-bottom:6px;line-height:1.4">'
+            'Clears all generated outputs and restarts from the beginning. '
+            'Your current work is archived in <code>.session_archives/</code> before anything is deleted.</div>',
+            unsafe_allow_html=True,
+        )
 
-# ── Tab 2: Results ────────────────────────────────────────────────────────────
+        phase = st.session_state.get("reset_phase", 0)
+        if phase == 0:
+            if st.button("Archive & reset to Mission 0", use_container_width=True):
+                st.session_state["reset_phase"] = 1
+                st.rerun()
+        elif phase == 1:
+            st.markdown(
+                '<div style="font-size:0.74rem;color:#7A3A2A;background:#FEF2F2;border:1px solid #FECACA;'
+                'border-radius:6px;padding:8px 10px;margin-bottom:8px;line-height:1.5">'
+                'This will delete all generated outputs, reports, and fetched data from this session. '
+                'A backup snapshot will be saved first. This cannot be undone through the dashboard.</div>',
+                unsafe_allow_html=True,
+            )
+            r1, r2 = st.columns(2)
+            if r1.button("Confirm reset", use_container_width=True):
+                fresh = do_full_reset(st.session_state["lab_state"])
+                st.session_state["lab_state"]           = fresh
+                st.session_state["entered_lab"]         = False
+                st.session_state["last_refresh_result"] = "reset:"
+                st.session_state["reset_phase"]         = 0
+                st.rerun()
+            if r2.button("Cancel", use_container_width=True):
+                st.session_state["reset_phase"] = 0
+                st.rerun()
+
+    st.divider()
+
+    # ── Mission rail ──────────────────────────────────────────────────────────
+    st.markdown(
+        '<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#2A4060;margin-bottom:10px">Missions</div>',
+        unsafe_allow_html=True,
+    )
+    render_sidebar_rail(st.session_state["lab_state"])
+
+# ── Page header ────────────────────────────────────────────────────────────────
+
+state = st.session_state["lab_state"]
+result_code = st.session_state.get("last_refresh_result")
+
+st.markdown(
+    '<div style="display:flex;align-items:baseline;gap:14px;padding:4px 0 8px 0">'
+    '<span style="font-size:1.25rem;font-weight:700;color:#0F172A;letter-spacing:-0.02em">Medical AI Lab</span>'
+    '<span style="font-size:0.74rem;color:#94A3B8;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Mission Cockpit</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# ── Notification strips ───────────────────────────────────────────────────────
+
+if result_code:
+    if result_code.startswith("missing:"):
+        missing_list = result_code[len("missing:"):]
+        pills_html = " ".join(
+            f'<code style="background:rgba(0,0,0,0.06);color:#92400E;'
+            f'padding:2px 6px;border-radius:4px;font-size:0.80rem">{s}.json</code>'
+            for s in missing_list.split(",") if s
+        )
+        st.markdown(
+            f'<div class="notif notif-warn">Artifacts not yet detected — still waiting for {pills_html}</div>',
+            unsafe_allow_html=True,
+        )
+    elif result_code.startswith("rebuilt:"):
+        n_det = result_code[len("rebuilt:"):]
+        st.markdown(
+            f'<div class="notif notif-rebuilt">Progress rebuilt from disk. '
+            f'{n_det} mission(s) detected as complete.</div>',
+            unsafe_allow_html=True,
+        )
+    elif result_code.startswith("reset:"):
+        st.markdown(
+            '<div class="notif notif-reset">Session archived and reset to Mission 0. Your previous work is saved in <code>.session_archives/</code>.</div>',
+            unsafe_allow_html=True,
+        )
+    # completion notifications are rendered inside the cockpit right panel
+
+st.divider()
+
+# ── Tabs ───────────────────────────────────────────────────────────────────────
+
+tab_cockpit, tab_map, tab_results, tab_reports, tab_eval, tab_prompts = st.tabs([
+    "▶  Lab Cockpit",
+    "Mission Map",
+    "Results",
+    "Reports",
+    "Evaluation",
+    "Prompt Archive",
+])
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 1 — LAB COCKPIT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab_cockpit:
+    state   = st.session_state["lab_state"]
+    cur_idx = min(state["current_mission"], len(MISSIONS) - 1)
+    mission = MISSIONS[cur_idx]
+    all_done = (len(state["completed_missions"]) == len(MISSIONS))
+
+    show_welcome = (
+        not st.session_state.get("entered_lab", False) and
+        len(state["completed_missions"]) == 0 and
+        cur_idx == 0
+    )
+
+    # ── Welcome / onboarding ────────────────────────────────────────────────
+    if show_welcome:
+        render_welcome_screen()
+
+    # ── All-done banner (full width) ────────────────────────────────────────
+    elif all_done and mission_stages_complete(cur_idx):
+        st.markdown(
+            """<div class="all-done-banner">
+              <div class="all-done-icon">✓</div>
+              <div class="all-done-title">Lab complete — all missions finished</div>
+              <div class="all-done-sub">
+                Review your artifacts in the Results and Reports tabs,
+                then push to submit.
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    # ── Cockpit (2-column) ──────────────────────────────────────────────────
+    if not show_welcome:
+        col_center, col_right = st.columns([0.63, 0.37])
+
+        with col_center:
+            render_cockpit_center(mission, cur_idx, state)
+
+        with col_right:
+            render_cockpit_right(cur_idx, state, result_code)
+
+        # Clear result after rendering
+        if result_code and not result_code.startswith("missing:"):
+            st.session_state["last_refresh_result"] = None
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 2 — MISSION MAP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab_map:
+    state = st.session_state["lab_state"]
+
+    st.markdown(
+        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+        'Mission Map</div>'
+        '<div style="font-size:0.88rem;color:#64748B;margin-bottom:18px">'
+        'Complete missions in order — each unlocks the next.</div>',
+        unsafe_allow_html=True,
+    )
+
+    for i, m in enumerate(MISSIONS):
+        disp      = get_mission_display_status(i, state)
+        chip_text = {"complete":"Complete","current":"Current","unlocked":"Unlocked","locked":"Locked"}[disp]
+
+        st.markdown(
+            f"""<div class="mmap-row {disp}">
+              <div class="mmap-dot {disp}">{("✓" if disp=="complete" else str(i))}</div>
+              <div style="flex:1;min-width:0">
+                <div class="mmap-title {disp}">{m['label']}</div>
+                <div class="mmap-goal">{m['goal']}</div>
+              </div>
+              <span class="chip chip-{disp}">{chip_text}</span>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        if disp != "locked":
+            with st.expander("Context + stage detail", expanded=False):
+                st.markdown(f"**Purpose:** {m['purpose']}")
+                st.markdown(f"**Why it matters:** {m['why_it_matters']}")
+                st.markdown(f"**Learning:** {m['student_learns']}")
+                st.write("")
+                for s in m["stages"]:
+                    ok    = stage_ok(s)
+                    color = "#15803D" if ok else "#64748B"
+                    bg    = "#F0FDF4" if ok else "#F8FAFC"
+                    mark  = "✓" if ok else "○"
+                    st.markdown(
+                        f'<span style="font-family:monospace;font-size:0.82rem;'
+                        f'color:{color};background:{bg};border-radius:4px;'
+                        f'padding:2px 7px">{mark}&nbsp;{s}.json</span>',
+                        unsafe_allow_html=True,
+                    )
+        st.write("")
+
+    st.divider()
+    st.metric("Missions complete", f"{len(state['completed_missions'])} / {len(MISSIONS)}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — RESULTS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_results:
-    st.subheader("Results")
+    st.markdown(
+        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:14px">'
+        'Results</div>',
+        unsafe_allow_html=True,
+    )
 
-    # Metrics summary
-    st.markdown("#### Key metrics")
+    val_m  = load_json(BASE / "outputs" / "metrics" / "val_metrics.json")
+    swap_m = load_json(BASE / "outputs" / "metrics" / "model_swap_comparison.json")
+    chal_m = load_json(BASE / "outputs" / "metrics" / "challenge_comparison.json")
 
-    val_metrics      = load_json(BASE / "outputs" / "metrics" / "val_metrics.json")
-    swap_metrics     = load_json(BASE / "outputs" / "metrics" / "model_swap_comparison.json")
-    challenge_metrics = load_json(BASE / "outputs" / "metrics" / "challenge_comparison.json")
-
-    m_col1, m_col2, m_col3 = st.columns(3)
-    with m_col1:
-        if val_metrics and "dice" in val_metrics:
-            st.metric("Baseline Dice (Mission 2)", f"{val_metrics['dice']:.3f}")
-        else:
-            st.metric("Baseline Dice (Mission 2)", "—")
-    with m_col2:
-        if swap_metrics and "new_dice" in swap_metrics:
-            delta = swap_metrics.get("delta")
-            delta_str = f"{delta:+.3f}" if isinstance(delta, (int, float)) else None
-            st.metric("After model swap (Mission 4)", f"{swap_metrics['new_dice']:.3f}", delta=delta_str)
-        else:
-            st.metric("After model swap (Mission 4)", "—")
-    with m_col3:
-        if challenge_metrics and "new_dice" in challenge_metrics:
-            delta = challenge_metrics.get("delta")
-            delta_str = f"{delta:+.3f}" if isinstance(delta, (int, float)) else None
-            st.metric("Day 2 adaptation (Mission 5)", f"{challenge_metrics['new_dice']:.3f}", delta=delta_str)
-        else:
-            st.metric("Day 2 adaptation (Mission 5)", "—")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Baseline Dice (M2)",    f"{val_m['dice']:.3f}"      if val_m  and "dice"    in val_m  else "—")
+    with c2:
+        dlt = swap_m.get("delta") if swap_m else None
+        st.metric("After model swap (M4)", f"{swap_m['new_dice']:.3f}" if swap_m and "new_dice" in swap_m else "—",
+                  delta=f"{dlt:+.3f}" if isinstance(dlt, float) else None)
+    with c3:
+        dlt = chal_m.get("delta") if chal_m else None
+        st.metric("Day 2 adaptation (M5)", f"{chal_m['new_dice']:.3f}" if chal_m and "new_dice" in chal_m else "—",
+                  delta=f"{dlt:+.3f}" if isinstance(dlt, float) else None)
 
     st.divider()
-
-    # Figures
-    st.markdown("#### Figures")
-
+    st.markdown(
+        '<div style="font-size:0.80rem;font-weight:700;color:#475569;'
+        'letter-spacing:0.10em;text-transform:uppercase;margin-bottom:12px">Figures</div>',
+        unsafe_allow_html=True,
+    )
     fig_paths = sorted((BASE / "outputs" / "figures").glob("*.png"))
     if not fig_paths:
-        st.info("No figures yet. Run Mission 2 to produce the first visualization.")
+        st.markdown(
+            '<div style="font-size:0.88rem;color:#94A3B8;padding:8px 0">'
+            'No figures yet. Run Mission 2 to produce the first visualization.</div>',
+            unsafe_allow_html=True,
+        )
     else:
         for i in range(0, len(fig_paths), 2):
             cols = st.columns(2)
@@ -421,25 +1765,25 @@ with tab_results:
                         st.image(str(p), caption=p.stem.replace("_", " "), use_container_width=True)
 
     st.divider()
-
     with st.expander("Raw stage status (JSON)", expanded=False):
-        status_files = sorted((BASE / "outputs" / "status").glob("*.json"))
-        if not status_files:
-            st.info("No stage status files found yet.")
-        else:
-            for p in status_files:
-                data = load_json(p)
-                if data:
-                    st.markdown(f"**{p.name}**")
-                    st.json(data)
+        for p in sorted((BASE / "outputs" / "status").glob("*.json")):
+            d = load_json(p)
+            if d:
+                st.markdown(f"**{p.name}**")
+                st.json(d)
 
-# ── Tab 3: Reports ────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — REPORTS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_reports:
-    st.subheader("Reports")
-    st.write("Written summaries produced by you and Claude during each mission.")
-    st.write("")
-
+    st.markdown(
+        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+        'Reports</div>'
+        '<div style="font-size:0.88rem;color:#64748B;margin-bottom:16px">'
+        'Written summaries produced by you and Claude during each mission.</div>',
+        unsafe_allow_html=True,
+    )
     report_files = [
         ("Day 1 Summary",       "day1_summary.md"),
         ("Translation Memo",    "translation_memo.md"),
@@ -451,148 +1795,139 @@ with tab_reports:
         ("Data Notes",          "data_notes.md"),
         ("Environment Check",   "env_check.md"),
     ]
-
     any_report = False
-    for display_name, filename in report_files:
-        content = report_text(filename)
+    for name, fname in report_files:
+        content = report_text(fname)
         if content and content.strip():
             any_report = True
-            with st.expander(display_name, expanded=False):
+            with st.expander(name, expanded=False):
                 st.markdown(content)
-
     if not any_report:
-        st.info(
-            "No reports yet. Reports appear here as you complete missions. "
-            "Each report is written by you and Claude together during the mission."
+        st.markdown(
+            '<div style="font-size:0.88rem;color:#94A3B8;padding:8px 0">'
+            'No reports yet. Reports appear here as you complete missions.</div>',
+            unsafe_allow_html=True,
         )
 
-# ── Tab 4: Evaluation ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — EVALUATION
+# ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_eval:
-    st.subheader("Evaluation — Submission Readiness")
-    st.write(
-        "This checklist mirrors the autograding tests CI runs on every push. "
-        "Run `make test` locally to see the same results. "
-        "All items must be present before your final push."
+    st.markdown(
+        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+        'Evaluation</div>'
+        '<div style="font-size:0.88rem;color:#64748B;margin-bottom:16px">'
+        'Mirrors the autograding CI tests. Run <code>make test</code> locally for the same result.</div>',
+        unsafe_allow_html=True,
     )
-    st.write("")
 
-    def artifact_row(label: str, present: bool, mission: str) -> None:
-        icon = "✅" if present else "❌"
-        col_icon, col_label, col_mission = st.columns([0.05, 0.65, 0.20])
-        with col_icon:
-            st.write(icon)
-        with col_label:
-            st.write(label)
-        with col_mission:
-            st.caption(mission)
+    def artifact_row(label: str, present: bool, tag: str) -> None:
+        ic = "✅" if present else "⬜"
+        c1, c2, c3 = st.columns([0.05, 0.65, 0.22])
+        c1.write(ic)
+        c2.write(label)
+        c3.caption(tag)
 
-    st.markdown("**Stage status files**")
-    for filename, mission in REQUIRED_STATUS:
-        stage_name = filename.replace(".json", "")
-        artifact_row(f"`outputs/status/{filename}`", stage_ok(stage_name), mission)
-
-    st.write("")
-    st.markdown("**Figures**")
-    for filename, mission in REQUIRED_FIGURES:
-        artifact_row(f"`outputs/figures/{filename}`", fig_exists(filename), mission)
+    st.markdown(
+        '<div style="font-size:0.80rem;font-weight:700;color:#475569;'
+        'letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Stage status files</div>',
+        unsafe_allow_html=True,
+    )
+    for fname, tag in REQUIRED_STATUS:
+        artifact_row(f"`outputs/status/{fname}`", stage_ok(fname.replace(".json", "")), tag)
 
     st.write("")
-    st.markdown("**Metric files**")
-    for filename, mission in REQUIRED_METRICS:
-        artifact_row(f"`outputs/metrics/{filename}`", metric_exists(filename), mission)
+    st.markdown(
+        '<div style="font-size:0.80rem;font-weight:700;color:#475569;'
+        'letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Figures</div>',
+        unsafe_allow_html=True,
+    )
+    for fname, tag in REQUIRED_FIGURES:
+        artifact_row(f"`outputs/figures/{fname}`", fig_exists(fname), tag)
 
     st.write("")
-    st.markdown("**Reports**")
-    for filename, mission in REQUIRED_REPORTS:
-        content = report_text(filename)
-        present = bool(content and len(content.strip()) > 50)
-        artifact_row(f"`reports/{filename}`", present, mission)
+    st.markdown(
+        '<div style="font-size:0.80rem;font-weight:700;color:#475569;'
+        'letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Metrics</div>',
+        unsafe_allow_html=True,
+    )
+    for fname, tag in REQUIRED_METRICS:
+        artifact_row(f"`outputs/metrics/{fname}`", metric_exists(fname), tag)
+
+    st.write("")
+    st.markdown(
+        '<div style="font-size:0.80rem;font-weight:700;color:#475569;'
+        'letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Reports</div>',
+        unsafe_allow_html=True,
+    )
+    for fname, tag in REQUIRED_REPORTS:
+        c = report_text(fname)
+        artifact_row(f"`reports/{fname}`", bool(c and len(c.strip()) > 50), tag)
 
     st.divider()
-
     all_checks = (
-        [stage_ok(f.replace(".json", "")) for f, _ in REQUIRED_STATUS]
-        + [fig_exists(f) for f, _ in REQUIRED_FIGURES]
-        + [metric_exists(f) for f, _ in REQUIRED_METRICS]
-        + [bool(report_text(f) and len((report_text(f) or "").strip()) > 50) for f, _ in REQUIRED_REPORTS]
+        [stage_ok(f.replace(".json","")) for f,_ in REQUIRED_STATUS]
+        + [fig_exists(f)    for f,_ in REQUIRED_FIGURES]
+        + [metric_exists(f) for f,_ in REQUIRED_METRICS]
+        + [bool(report_text(f) and len((report_text(f) or "").strip()) > 50) for f,_ in REQUIRED_REPORTS]
     )
-    n_pass  = sum(all_checks)
-    n_total = len(all_checks)
-
-    if n_pass == n_total:
-        st.success(f"All {n_total} artifacts present — ready to push.")
+    n_pass = sum(all_checks)
+    n_tot  = len(all_checks)
+    if n_pass == n_tot:
+        st.success(f"All {n_tot} artifacts present — ready to push.")
     else:
-        st.warning(
-            f"{n_pass} / {n_total} artifacts present. "
-            "Complete remaining missions before your final push."
-        )
+        st.warning(f"{n_pass} / {n_tot} artifacts present. Complete remaining missions before your final push.")
 
-# ── Tab 5: Prompt Studio ─────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 6 — PROMPT ARCHIVE
+# ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_prompts:
-    st.subheader("Prompt Studio")
-    st.info(
-        "These prompts are **read-only** here. "
-        "To run a prompt, copy the relevant layer into your **VS Code + Claude Code** session. "
-        "The dashboard is for orientation — Claude interaction happens in VS Code + Claude Code."
+    st.markdown(
+        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+        'Prompt Archive</div>'
+        '<div style="font-size:0.88rem;color:#64748B;margin-bottom:16px">'
+        'Read-only reference. Prompts are run in VS Code + Claude Code, not here. '
+        'The Lab Cockpit tab shows the active prompt in context.</div>',
+        unsafe_allow_html=True,
     )
-    st.write("")
 
-    # Build selector: one entry per prompt file, grouped by mission label
     prompt_options: list[tuple[str, str]] = []
-    for mission in MISSIONS:
-        for pfile in mission["prompts"]:
-            display = f"{mission['label']}  ·  {pfile}"
-            prompt_options.append((display, pfile))
+    for m in MISSIONS:
+        for pf in m["prompts"]:
+            prompt_options.append((f"{m['label']}  ·  {pf}", pf))
 
-    option_labels = [label for label, _ in prompt_options]
-    option_files  = [pfile for _, pfile in prompt_options]
-
-    selected_idx = st.selectbox(
-        "Select a mission prompt",
-        range(len(option_labels)),
-        format_func=lambda i: option_labels[i],
-    )
-
+    option_labels = [lbl for lbl, _ in prompt_options]
+    option_files  = [pf  for _, pf  in prompt_options]
+    selected_idx  = st.selectbox("Select a mission prompt", range(len(option_labels)),
+                                 format_func=lambda i: option_labels[i])
     selected_file = option_files[selected_idx]
-    content = prompt_text(selected_file)
-
+    content       = prompt_text(selected_file)
     st.write("")
 
     if not content:
-        st.warning(f"`prompts/{selected_file}` not found. Check that the prompts directory is intact.")
+        st.warning(f"`prompts/{selected_file}` not found.")
     else:
         layers = parse_prompt_layers(content)
-
+        st.markdown(f"`prompts/{selected_file}`")
+        st.divider()
         if layers:
-            # Structured display: Layer A / B / C
-            st.markdown(f"**File:** `prompts/{selected_file}`")
-            st.divider()
-
             if "A" in layers:
                 st.markdown("#### Layer A — Base prompt")
-                st.caption("Run this prompt in VS Code + Claude Code to start the mission.")
+                st.caption("Run in VS Code + Claude Code to start the mission.")
                 st.markdown(layers["A"])
-
             if "B" in layers:
                 st.write("")
                 st.markdown("#### Layer B — Reflection prompt")
                 st.caption("Run after completing Layer A and reviewing the artifacts.")
                 st.markdown(layers["B"])
-
             if "C" in layers:
                 st.write("")
-                st.markdown("#### Layer C — What you can customize")
-                st.caption("Optional extension — experiment with your own prompt variation.")
+                st.markdown("#### Layer C — Customization")
+                st.caption("Optional extension.")
                 st.markdown(layers["C"])
-
-            # Full file available in expander
             with st.expander("Full prompt file", expanded=False):
                 st.markdown(content)
-
         else:
-            # Prompt doesn't have Layer A/B/C sections — show full content
-            st.markdown(f"**File:** `prompts/{selected_file}`")
-            st.divider()
             st.markdown(content)
