@@ -1,7 +1,0 @@
-{
-  "dice": 0.5740567062447474,
-  "n_slices": 10,
-  "threshold": 0.5,
-  "per_slice_dice_mean": 0.5740567062447474,
-  "per_slice_dice_std": 0.2362589425881569
-}

@@ -1,8 +1,0 @@
-{
-  "status": "ok",
-  "dataset": "a teaching-pack dataset",
-  "modality": "FLAIR (channel 3), per-slice normalised to [0, 255]",
-  "n_slices": 10,
-  "best_dice": 0.5917,
-  "best_method": "largest-CC post-processing"
-}

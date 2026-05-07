@@ -1,0 +1,52 @@
+{
+  "archived_at": "2026-05-07T07:17:15.627619+00:00",
+  "archived_by": "reset_student_state.py",
+  "missions_completed": 0,
+  "student_state": {
+    "current_mission": 0,
+    "completed_missions": [],
+    "unlocked_missions": [
+      0
+    ],
+    "last_checked": null,
+    "mode": "guided"
+  },
+  "artifacts_present": {
+    "status_files": [
+      "stage_00_bootstrap.json",
+      "stage_01_fetch_sample.json",
+      "stage_02_load_visualize.json",
+      "stage_03_train_baseline.json",
+      "stage_04_error_analysis.json",
+      "stage_05_model_swap.json",
+      "stage_06_pack_report.json",
+      "stage_07_challenge_plan.json",
+      "stage_08_adapt_pipeline.json",
+      "stage_09_translation_memo.json"
+    ],
+    "figures": [
+      "challenge_comparison.png",
+      "error_analysis_best.png",
+      "error_analysis_worst.png",
+      "loss_curve.png",
+      "model_swap_comparison.png",
+      "sample_overlay.png"
+    ],
+    "metrics": [
+      "challenge_comparison.json",
+      "model_swap_comparison.json",
+      "val_metrics.json"
+    ],
+    "reports": [
+      "env_check.md",
+      "data_notes.md",
+      "train_notes.md",
+      "error_analysis.md",
+      "model_swap.md",
+      "day1_summary.md",
+      "challenge_plan.md",
+      "adapt_pipeline.md",
+      "translation_memo.md"
+    ]
+  }
+}
