@@ -1,0 +1,21 @@
+{
+  "archived_at": "2026-05-07T08:18:11.840965+00:00",
+  "missions_completed": 0,
+  "current_mission": 0,
+  "completed_missions": [],
+  "student_state_snapshot": {
+    "current_mission": 0,
+    "completed_missions": [],
+    "unlocked_missions": [
+      0
+    ],
+    "last_checked": "2026-05-07T08:16:11.515241+00:00",
+    "mode": "guided"
+  },
+  "artifacts_present": {
+    "status_files": [],
+    "figures": [],
+    "metric_files": [],
+    "reports": []
+  }
+}

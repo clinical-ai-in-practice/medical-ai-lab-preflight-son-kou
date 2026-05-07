@@ -10,6 +10,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 import json
 import re
+import subprocess
+import time
 import streamlit as st
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
@@ -564,6 +566,54 @@ small.stCaption { color: #94A3B8 !important; }
 .notif-rebuilt { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1D4ED8; }
 .notif-reset   { background: #F8FAFC; border: 1px solid #E2E8F0; color: #64748B; }
 
+/* Checkpoint panel */
+.checkpoint-panel {
+    background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 12px;
+    padding: 24px 28px; margin: 8px 0 16px 0; text-align: center;
+}
+.checkpoint-panel.fail {
+    background: #FFF7ED; border-color: #FCD34D;
+}
+.checkpoint-title {
+    font-size: 1.15rem; font-weight: 700; color: #166534; margin: 0 0 6px 0;
+}
+.checkpoint-panel.fail .checkpoint-title { color: #92400E; }
+.checkpoint-detail { font-size: 0.83rem; color: #166534; margin: 0; line-height: 1.5; }
+.checkpoint-panel.fail .checkpoint-detail { color: #92400E; }
+
+/* Mission number badge */
+.mission-num-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #2563EB; color: #fff; font-size: 0.95rem; font-weight: 800;
+    flex-shrink: 0; margin-right: 10px;
+}
+
+/* Prompt principle callout */
+.prompt-principle-callout {
+    background: #EFF6FF; border-left: 4px solid #2563EB; border-radius: 0 8px 8px 0;
+    padding: 10px 14px; margin: 10px 0 4px 0;
+}
+.prompt-principle-label {
+    font-size: 0.72rem; font-weight: 700; color: #2563EB; text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 0 0 3px 0;
+}
+.prompt-principle-name { font-size: 0.88rem; font-weight: 700; color: #1E40AF; margin: 0 0 4px 0; }
+.prompt-principle-body { font-size: 0.80rem; color: #334155; margin: 0; line-height: 1.5; }
+
+/* Session archive rows */
+.archive-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+    padding: 8px 12px; margin: 4px 0; font-size: 0.80rem; color: #334155;
+}
+.archive-ts { font-family: monospace; color: #64748B; font-size: 0.76rem; }
+
+/* Mission map clickable card highlight */
+.mission-map-card-revisit {
+    cursor: pointer; border: 2px solid #2563EB !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -703,6 +753,10 @@ def init_session_state() -> None:
         st.session_state["confirm_reset"] = False
     if "reset_phase" not in st.session_state:
         st.session_state["reset_phase"] = 0   # 0=idle 1=confirm 2=done
+    if "checkpoint" not in st.session_state:
+        st.session_state["checkpoint"] = None  # None | {"phase": "checking"|"result", "mission_idx": int, "passed": bool, "details": list}
+    if "viewing_mission_idx" not in st.session_state:
+        st.session_state["viewing_mission_idx"] = None  # None = current; int = revisit mode
 
 # ── Mission definitions ───────────────────────────────────────────────────────
 
@@ -730,6 +784,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/status/stage_00_bootstrap.json", "reports/env_check.md"],
         "make_commands":    ["make bootstrap"],
+        "prompt_principle": "Explicit task + expected output",
+        "takeaway": "Numbering each step lets Claude track and report progress faithfully. Stating the expected output file prevents Claude from deciding what 'done' means.",
     },
     {
         "label": "Mission 1 — Receive the Signal",
@@ -753,6 +809,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/status/stage_01_fetch_sample.json", "data/sample/  (imaging dataset)"],
         "make_commands":    ["make fetch-sample"],
+        "prompt_principle": "File permission scope + state assertion",
+        "takeaway": "Telling Claude exactly which files it may touch prevents side effects. Asserting the expected state ('data/sample/ should contain N cases') forces explicit validation rather than silent completion.",
     },
     {
         "label": "Mission 2 — Build the First Detector",
@@ -776,6 +834,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/figures/sample_overlay.png", "outputs/figures/loss_curve.png", "outputs/metrics/val_metrics.json", "outputs/status/stage_02_load_visualize.json", "outputs/status/stage_03_train_baseline.json"],
         "make_commands":    ["make visualize", "make smoke-train"],
+        "prompt_principle": "Stage sequencing + artifact contract",
+        "takeaway": "Listing expected output files as a contract — not a description — means Claude produces exactly what the evaluation checks. The sequence (visualize, then train) prevents Claude from skipping steps to save time.",
     },
     {
         "label": "Mission 3 — Investigate Failure",
@@ -798,6 +858,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/figures/error_analysis_best.png", "outputs/figures/error_analysis_worst.png", "outputs/status/stage_04_error_analysis.json", "reports/error_analysis.md"],
         "make_commands":    ["make error-analysis"],
+        "prompt_principle": "Observation → hypothesis framing",
+        "takeaway": "Asking Claude to 'form a hypothesis from the worst-case examples' shifts it from summarizing to reasoning. The prompt forces Claude to commit to a testable claim, not just describe what it sees.",
     },
     {
         "label": "Mission 4 — Improve With Intent",
@@ -821,6 +883,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/metrics/model_swap_comparison.json", "outputs/figures/model_swap_comparison.png", "outputs/status/stage_05_model_swap.json", "reports/model_swap.md", "reports/day1_summary.md", "outputs/status/stage_06_pack_report.json"],
         "make_commands":    ["make model-swap", "make pack-report"],
+        "prompt_principle": "Control variable framing",
+        "takeaway": "Specifying 'change only X, hold everything else constant' is not micromanagement — it is experimental design. A prompt that names the control variable produces a comparable result; one that doesn't produces uninterpretable noise.",
     },
     {
         "label": "Mission 5 — Design the Next Study",
@@ -844,6 +908,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/status/stage_07_challenge_plan.json", "reports/challenge_plan.md", "outputs/metrics/challenge_comparison.json", "outputs/figures/challenge_comparison.png", "outputs/status/stage_08_adapt_pipeline.json", "reports/adapt_pipeline.md"],
         "make_commands":    ["make challenge-plan", "make adapt-pipeline"],
+        "prompt_principle": "Plan before code",
+        "takeaway": "Asking Claude to write a plan first — before any implementation — forces it to reason through the approach and surface assumptions. The plan becomes the check on whether the implementation drifted from intent.",
     },
     {
         "label": "Mission 6 — Translate Responsibly",
@@ -867,6 +933,8 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/status/stage_09_translation_memo.json", "reports/translation_memo.md"],
         "make_commands":    ["make translation-memo"],
+        "prompt_principle": "Honesty constraint + audience framing",
+        "takeaway": "Telling Claude 'write this for a clinical collaborator who is not an ML expert, and do not overstate prototype capabilities' shapes both honesty and register. Without audience framing, Claude defaults to technical optimism.",
     },
 ]
 
@@ -1077,6 +1145,138 @@ def do_full_reset(state: dict) -> dict:
     return fresh
 
 
+def attempt_git_checkpoint(mission_label: str) -> tuple[bool, str]:
+    """Try to create a git checkpoint commit. Returns (success, message)."""
+    try:
+        # Check if we're in a git repo
+        r = subprocess.run(
+            ["git", "-C", str(BASE), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode != 0:
+            return False, "Not a git repository — skipping checkpoint commit."
+        # Stage all outputs and reports
+        subprocess.run(
+            ["git", "-C", str(BASE), "add", "outputs/", "reports/", ".lab_history/"],
+            capture_output=True, timeout=10,
+        )
+        # Check if there's anything staged
+        status = subprocess.run(
+            ["git", "-C", str(BASE), "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if not status.stdout.strip():
+            return True, "Nothing new to commit — artifacts already checkpointed."
+        slug = mission_label.split("—")[0].strip().lower().replace(" ", "-")
+        msg  = f"checkpoint: {mission_label} complete"
+        cr = subprocess.run(
+            ["git", "-C", str(BASE), "commit", "-m", msg],
+            capture_output=True, text=True, timeout=15,
+        )
+        if cr.returncode == 0:
+            return True, f"Checkpoint commit created: {msg}"
+        return False, f"Commit failed: {cr.stderr.strip()[:120]}"
+    except Exception as e:
+        return False, f"Git checkpoint error: {e}"
+
+
+def run_mission_checkpoint(mission_idx: int, state: dict) -> dict:
+    """
+    Run all completion checks for a mission and return a checkpoint result dict.
+    Keys: passed (bool), details (list of (ok, label) tuples), summary (str)
+    """
+    mission  = MISSIONS[mission_idx]
+    details  = []
+
+    # Stage status checks
+    for stage in mission["stages"]:
+        ok = stage_ok(stage)
+        details.append((ok, f"Stage {stage} complete"))
+
+    # Expected output checks
+    for out in mission["expected_outputs"]:
+        path = BASE / out
+        ok   = path.exists() if not out.endswith("/") else path.is_dir()
+        details.append((ok, f"Output exists: {out.split('/')[-1]}"))
+
+    passed  = all(ok for ok, _ in details)
+    summary = "All checks passed." if passed else f"{sum(not ok for ok, _ in details)} check(s) failed."
+    return {"passed": passed, "details": details, "summary": summary, "mission_idx": mission_idx}
+
+
+def render_checkpoint_panel(cp: dict) -> None:
+    """Render the mission completion checkpoint panel (animated progress → result)."""
+    phase = cp.get("phase", "result")
+
+    if phase == "checking":
+        st.markdown(
+            '<div style="background:#EFF6FF;border:1.5px solid #93C5FD;border-radius:12px;padding:20px 24px;margin:8px 0 16px 0">'
+            '<p style="font-size:0.95rem;font-weight:700;color:#1E40AF;margin:0 0 10px 0">Running checkpoint checks…</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        bar = st.progress(0)
+        mission   = MISSIONS[cp["mission_idx"]]
+        total     = len(mission["stages"]) + len(mission["expected_outputs"])
+        for i in range(total):
+            time.sleep(0.18)
+            bar.progress(int((i + 1) / total * 100))
+        bar.empty()
+        # Compute result
+        result = run_mission_checkpoint(cp["mission_idx"], st.session_state.get("lab_state", {}))
+        st.session_state["checkpoint"] = {**cp, "phase": "result", **result}
+        st.rerun()
+
+    else:
+        passed  = cp.get("passed", False)
+        details = cp.get("details", [])
+        summary = cp.get("summary", "")
+        panel_cls = "checkpoint-panel" if passed else "checkpoint-panel fail"
+        title = "Mission checkpoint passed" if passed else "Checkpoint — some items incomplete"
+        st.markdown(f'<div class="{panel_cls}"><p class="checkpoint-title">{title}</p><p class="checkpoint-detail">{summary}</p></div>', unsafe_allow_html=True)
+        for ok, label in details:
+            icon = "✓" if ok else "✗"
+            col  = "#166534" if ok else "#B91C1C"
+            st.markdown(f'<span style="color:{col};font-size:0.83rem">{icon} {label}</span>', unsafe_allow_html=True)
+        if passed:
+            st.markdown("")
+            with st.expander("Create checkpoint commit (optional)"):
+                if st.button("Create git checkpoint commit", key="btn_git_cp"):
+                    ok, msg = attempt_git_checkpoint(MISSIONS[cp["mission_idx"]]["label"])
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.warning(msg)
+        if st.button("Close checkpoint", key="btn_close_cp"):
+            st.session_state["checkpoint"] = None
+            st.rerun()
+
+
+def render_session_archive_section() -> None:
+    """Show archived sessions from .session_archives/ as expandable rows."""
+    archive_dir = BASE / ".session_archives"
+    if not archive_dir.exists():
+        st.markdown('<p style="font-size:0.82rem;color:#64748B">No session archives yet.</p>', unsafe_allow_html=True)
+        return
+    archives = sorted(archive_dir.glob("session_*.json"), reverse=True)
+    if not archives:
+        st.markdown('<p style="font-size:0.82rem;color:#64748B">No session archives yet.</p>', unsafe_allow_html=True)
+        return
+    for path in archives[:10]:
+        ts = path.stem.replace("session_", "").replace("_", " ", 1)
+        data = load_json(path)
+        label = ts
+        if data and "state" in data:
+            cur = data["state"].get("current_mission", "?")
+            comp = len(data["state"].get("completed_missions", []))
+            label = f"{ts}  —  Mission {cur}, {comp} completed"
+        with st.expander(label):
+            if data:
+                st.json(data.get("state", data), expanded=False)
+            else:
+                st.markdown("_Could not parse archive file._")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # UI RENDERING
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1186,13 +1386,17 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
     parts   = mission["label"].split("—")
     m_num   = parts[0].strip()
     m_title = parts[1].strip() if len(parts) > 1 else mission["label"]
+    m_digit = m_num.replace("Mission ", "").strip()
 
     st.markdown(
-        f"""<div class="cockpit-mission-header">
-          <div class="cockpit-mission-eyebrow">Current Mission · {m_num}</div>
-          <div class="cockpit-mission-title">{m_title}</div>
-          <div class="cockpit-mission-goal">{mission['goal']}</div>
-        </div>""",
+        f'<div class="cockpit-mission-header">'
+        f'<div class="cockpit-mission-eyebrow">Current Mission</div>'
+        f'<div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px 0">'
+        f'<div class="mission-num-badge">{m_digit}</div>'
+        f'<div class="cockpit-mission-title" style="margin:0">{m_title}</div>'
+        f'</div>'
+        f'<div class="cockpit-mission-goal">{mission["goal"]}</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -1240,6 +1444,19 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
     else:
         st.warning(f"`prompts/{pfile}` not found.")
 
+    # ── Prompt principle callout ────────────────────────────────────────────
+    pp = mission.get("prompt_principle")
+    tk = mission.get("takeaway")
+    if pp:
+        st.markdown(
+            f'<div class="prompt-principle-callout">'
+            f'<p class="prompt-principle-label">Prompt principle</p>'
+            f'<p class="prompt-principle-name">{pp}</p>'
+            + (f'<p class="prompt-principle-body">{tk}</p>' if tk else "")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+
     # ── After-running checklist ─────────────────────────────────────────────
     cmd_str = f"<code>{make_cmd}</code>" if make_cmd else "the verification command"
     run_steps = [
@@ -1262,15 +1479,16 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
     st.divider()
 
     # ── Layer B — Reflection ────────────────────────────────────────────────
-    mission_done = cur_idx in state["completed_missions"]
+    # Use mission_stages_complete for real-time check (doesn't require state refresh)
+    mission_done = mission_stages_complete(cur_idx) or (cur_idx in state["completed_missions"])
 
     if not mission_done:
         st.markdown(
-            """<div class="layer-b-lock">
-              <div class="layer-b-lock-icon">🔒</div>
-              <div class="layer-b-lock-title">Reflection prompt locked</div>
-              <div class="layer-b-lock-hint">Complete this mission, then refresh to unlock.</div>
-            </div>""",
+            '<div class="layer-b-lock">'
+            '<div class="layer-b-lock-icon">🔒</div>'
+            '<div class="layer-b-lock-title">Reflection prompt locked</div>'
+            '<div class="layer-b-lock-hint">Complete all stages for this mission to unlock the reflection prompt.</div>'
+            '</div>',
             unsafe_allow_html=True,
         )
     else:
@@ -1334,7 +1552,12 @@ def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> 
         )
 
     # ── Artifact preview ─────────────────────────────────────────────────────
-    st.markdown('<div class="artifact-panel-label">Artifacts</div>', unsafe_allow_html=True)
+    art_col, ref_col = st.columns([3, 1])
+    with art_col:
+        st.markdown('<div class="artifact-panel-label">Artifacts</div>', unsafe_allow_html=True)
+    with ref_col:
+        if st.button("⟳ Refresh", key="btn_artifact_refresh", help="Re-scan outputs for new artifacts"):
+            st.rerun()
 
     fig_file    = preview.get("figure")
     metric_info = preview.get("metric")         # (filename, key, label)
@@ -1408,12 +1631,17 @@ def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> 
         bg    = "#F0FDF4" if ok else "#F8FAFC"
         bd    = "#BBF7D0" if ok else "#E2E8F0"
         mark  = "✓" if ok else "○"
-        st.markdown(
-            f'<div style="font-size:0.80rem;font-family:monospace;color:{color};'
-            f'background:{bg};border:1px solid {bd};border-radius:5px;'
-            f'padding:4px 10px;margin-bottom:5px">{mark}&nbsp;{s}</div>',
-            unsafe_allow_html=True,
-        )
+        status_data = load_json(BASE / "outputs" / "status" / f"{s}.json") if ok else None
+        if ok and status_data:
+            with st.expander(f"{mark} {s}", expanded=False):
+                st.json({k: v for k, v in list(status_data.items())[:8]})
+        else:
+            st.markdown(
+                f'<div style="font-size:0.80rem;font-family:monospace;color:{color};'
+                f'background:{bg};border:1px solid {bd};border-radius:5px;'
+                f'padding:4px 10px;margin-bottom:5px">{mark}&nbsp;{s}</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── File constraints (collapsed) ─────────────────────────────────────────
     with st.expander("Allowed / protected files", expanded=False):
@@ -1482,11 +1710,9 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     if st.button("✓  I finished — check my progress", use_container_width=True, type="primary"):
-        new_state, result_code = do_refresh_current_mission(state)
-        save_student_state(new_state)
-        st.session_state["lab_state"]           = new_state
-        st.session_state["last_refresh_result"] = result_code
-        st.session_state["reset_phase"]         = 0
+        cur_mission_idx = min(state["current_mission"], len(MISSIONS) - 1)
+        st.session_state["checkpoint"] = {"phase": "checking", "mission_idx": cur_mission_idx}
+        st.session_state["reset_phase"] = 0
         st.rerun()
 
     st.divider()
@@ -1619,48 +1845,90 @@ tab_cockpit, tab_map, tab_results, tab_reports, tab_eval, tab_prompts = st.tabs(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_cockpit:
-    state   = st.session_state["lab_state"]
-    cur_idx = min(state["current_mission"], len(MISSIONS) - 1)
-    mission = MISSIONS[cur_idx]
+    state    = st.session_state["lab_state"]
+    cur_idx  = min(state["current_mission"], len(MISSIONS) - 1)
     all_done = (len(state["completed_missions"]) == len(MISSIONS))
 
-    show_welcome = (
-        not st.session_state.get("entered_lab", False) and
-        len(state["completed_missions"]) == 0 and
-        cur_idx == 0
-    )
+    # ── Checkpoint mode — replaces cockpit with animated checkpoint panel ────
+    checkpoint    = st.session_state.get("checkpoint")
+    in_checkpoint = checkpoint is not None
 
-    # ── Welcome / onboarding ────────────────────────────────────────────────
-    if show_welcome:
-        render_welcome_screen()
-
-    # ── All-done banner (full width) ────────────────────────────────────────
-    elif all_done and mission_stages_complete(cur_idx):
+    if in_checkpoint:
+        view_idx = checkpoint.get("mission_idx", cur_idx)
         st.markdown(
-            """<div class="all-done-banner">
-              <div class="all-done-icon">✓</div>
-              <div class="all-done-title">Lab complete — all missions finished</div>
-              <div class="all-done-sub">
-                Review your artifacts in the Results and Reports tabs,
-                then push to submit.
-              </div>
-            </div>""",
+            f'<div style="font-size:0.90rem;font-weight:600;color:#1E40AF;margin-bottom:12px">'
+            f'Checking: {MISSIONS[view_idx]["label"]}</div>',
             unsafe_allow_html=True,
         )
+        render_checkpoint_panel(checkpoint)
+        # After checkpoint passes, also propagate state advancement
+        if checkpoint.get("phase") == "result" and checkpoint.get("passed"):
+            new_state, code = do_refresh_current_mission(state)
+            if new_state != state:
+                save_student_state(new_state)
+                st.session_state["lab_state"]           = new_state
+                st.session_state["last_refresh_result"] = code
 
-    # ── Cockpit (2-column) ──────────────────────────────────────────────────
-    if not show_welcome:
-        col_center, col_right = st.columns([0.63, 0.37])
+    if not in_checkpoint:
+        # ── Revisit mode — show a completed mission instead of current ───────
+        view_idx_override = st.session_state.get("viewing_mission_idx")
+        if view_idx_override is not None:
+            view_state = get_mission_display_status(view_idx_override, state)
+            if view_state not in ("complete", "current", "unlocked"):
+                st.session_state["viewing_mission_idx"] = None
+                view_idx_override = None
+            else:
+                st.markdown(
+                    f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;'
+                    f'padding:8px 14px;margin-bottom:12px">'
+                    f'<span style="font-size:0.83rem;color:#1E40AF;font-weight:600">'
+                    f'Revisiting: {MISSIONS[view_idx_override]["label"]}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                back_col, _ = st.columns([0.22, 0.78])
+                with back_col:
+                    if st.button("← Back to current", key="btn_back_current"):
+                        st.session_state["viewing_mission_idx"] = None
+                        st.rerun()
 
-        with col_center:
-            render_cockpit_center(mission, cur_idx, state)
+        display_idx = view_idx_override if view_idx_override is not None else cur_idx
+        mission = MISSIONS[display_idx]
 
-        with col_right:
-            render_cockpit_right(cur_idx, state, result_code)
+        show_welcome = (
+            not st.session_state.get("entered_lab", False) and
+            len(state["completed_missions"]) == 0 and
+            cur_idx == 0
+        )
 
-        # Clear result after rendering
-        if result_code and not result_code.startswith("missing:"):
-            st.session_state["last_refresh_result"] = None
+        # ── Welcome / onboarding ──────────────────────────────────────────────
+        if show_welcome:
+            render_welcome_screen()
+
+        # ── All-done banner ───────────────────────────────────────────────────
+        elif all_done and mission_stages_complete(cur_idx) and view_idx_override is None:
+            st.markdown(
+                '<div class="all-done-banner">'
+                '<div class="all-done-icon">✓</div>'
+                '<div class="all-done-title">Lab complete — all missions finished</div>'
+                '<div class="all-done-sub">Review your artifacts in the Results and Reports tabs, then push to submit.</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── Cockpit (2-column) ────────────────────────────────────────────────
+        if not show_welcome:
+            col_center, col_right = st.columns([0.63, 0.37])
+
+            with col_center:
+                render_cockpit_center(mission, display_idx, state)
+
+            with col_right:
+                render_cockpit_right(display_idx, state, result_code if view_idx_override is None else None)
+
+            # Clear result after rendering
+            if result_code and not result_code.startswith("missing:"):
+                st.session_state["last_refresh_result"] = None
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — MISSION MAP
@@ -1694,22 +1962,29 @@ with tab_map:
         )
 
         if disp != "locked":
-            with st.expander("Context + stage detail", expanded=False):
-                st.markdown(f"**Purpose:** {m['purpose']}")
-                st.markdown(f"**Why it matters:** {m['why_it_matters']}")
-                st.markdown(f"**Learning:** {m['student_learns']}")
-                st.write("")
-                for s in m["stages"]:
-                    ok    = stage_ok(s)
-                    color = "#15803D" if ok else "#64748B"
-                    bg    = "#F0FDF4" if ok else "#F8FAFC"
-                    mark  = "✓" if ok else "○"
-                    st.markdown(
-                        f'<span style="font-family:monospace;font-size:0.82rem;'
-                        f'color:{color};background:{bg};border-radius:4px;'
-                        f'padding:2px 7px">{mark}&nbsp;{s}.json</span>',
-                        unsafe_allow_html=True,
-                    )
+            exp_col, btn_col = st.columns([0.78, 0.22])
+            with exp_col:
+                with st.expander("Context + stage detail", expanded=False):
+                    st.markdown(f"**Purpose:** {m['purpose']}")
+                    st.markdown(f"**Why it matters:** {m['why_it_matters']}")
+                    st.markdown(f"**Learning:** {m['student_learns']}")
+                    st.write("")
+                    for s in m["stages"]:
+                        ok    = stage_ok(s)
+                        color = "#15803D" if ok else "#64748B"
+                        bg    = "#F0FDF4" if ok else "#F8FAFC"
+                        mark  = "✓" if ok else "○"
+                        st.markdown(
+                            f'<span style="font-family:monospace;font-size:0.82rem;'
+                            f'color:{color};background:{bg};border-radius:4px;'
+                            f'padding:2px 7px">{mark}&nbsp;{s}.json</span>',
+                            unsafe_allow_html=True,
+                        )
+            with btn_col:
+                if disp == "complete":
+                    if st.button("Revisit", key=f"revisit_{i}", help=f"View {m['label']} in Lab Cockpit"):
+                        st.session_state["viewing_mission_idx"] = i
+                        st.rerun()
         st.write("")
 
     st.divider()
@@ -1893,41 +2168,72 @@ with tab_prompts:
         unsafe_allow_html=True,
     )
 
-    prompt_options: list[tuple[str, str]] = []
-    for m in MISSIONS:
-        for pf in m["prompts"]:
-            prompt_options.append((f"{m['label']}  ·  {pf}", pf))
+    for mi, m in enumerate(MISSIONS):
+        disp = get_mission_display_status(mi, state)
+        parts   = m["label"].split("—")
+        m_digit = parts[0].strip().replace("Mission ", "").strip()
+        m_title = parts[1].strip() if len(parts) > 1 else m["label"]
+        status_badge = {"complete": "✓ Complete", "current": "→ Current", "unlocked": "Unlocked", "locked": "Locked"}[disp]
+        badge_color  = {"complete": "#166534", "current": "#1E40AF", "unlocked": "#475569", "locked": "#94A3B8"}[disp]
+        header_html = (
+            f'<div style="display:flex;align-items:center;gap:10px">'
+            f'<div class="mission-num-badge" style="width:26px;height:26px;font-size:0.80rem">{m_digit}</div>'
+            f'<span style="font-weight:600;color:#0F172A">{m_title}</span>'
+            f'<span style="font-size:0.75rem;font-weight:600;color:{badge_color};margin-left:4px">{status_badge}</span>'
+            f'</div>'
+        )
 
-    option_labels = [lbl for lbl, _ in prompt_options]
-    option_files  = [pf  for _, pf  in prompt_options]
-    selected_idx  = st.selectbox("Select a mission prompt", range(len(option_labels)),
-                                 format_func=lambda i: option_labels[i])
-    selected_file = option_files[selected_idx]
-    content       = prompt_text(selected_file)
-    st.write("")
+        with st.expander(m["label"], expanded=(disp == "current")):
+            st.markdown(header_html, unsafe_allow_html=True)
+            pp = m.get("prompt_principle")
+            tk = m.get("takeaway")
+            if pp:
+                st.markdown(
+                    f'<div class="prompt-principle-callout">'
+                    f'<p class="prompt-principle-label">Prompt principle</p>'
+                    f'<p class="prompt-principle-name">{pp}</p>'
+                    + (f'<p class="prompt-principle-body">{tk}</p>' if tk else "")
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+            st.write("")
+            for pf in m["prompts"]:
+                content = prompt_text(pf)
+                if not content:
+                    st.caption(f"`prompts/{pf}` — not found")
+                    continue
+                layers = parse_prompt_layers(content)
+                st.markdown(f'<span style="font-size:0.75rem;font-family:monospace;color:#64748B">{pf}</span>', unsafe_allow_html=True)
+                if layers:
+                    if "A" in layers:
+                        st.markdown("**Layer A — Base prompt**")
+                        st.caption("Run in VS Code + Claude Code to start the mission.")
+                        quote, ctx = extract_prompt_quote(layers["A"])
+                        if quote:
+                            st.code(quote, language=None)
+                            if ctx:
+                                with st.expander("Full context", expanded=False):
+                                    st.markdown(ctx)
+                        else:
+                            st.code(layers["A"][:500] + ("..." if len(layers["A"]) > 500 else ""), language=None)
+                    if "B" in layers:
+                        st.write("")
+                        st.markdown("**Layer B — Reflection prompt**")
+                        st.caption("Run after completing Layer A and reviewing the artifacts.")
+                        with st.container(border=True):
+                            st.markdown(layers["B"])
+                    if "C" in layers:
+                        st.write("")
+                        with st.expander("Layer C — Customization (optional)", expanded=False):
+                            st.markdown(layers["C"])
+                else:
+                    st.code(content[:500] + ("..." if len(content) > 500 else ""), language=None)
+                st.write("")
 
-    if not content:
-        st.warning(f"`prompts/{selected_file}` not found.")
-    else:
-        layers = parse_prompt_layers(content)
-        st.markdown(f"`prompts/{selected_file}`")
-        st.divider()
-        if layers:
-            if "A" in layers:
-                st.markdown("#### Layer A — Base prompt")
-                st.caption("Run in VS Code + Claude Code to start the mission.")
-                st.markdown(layers["A"])
-            if "B" in layers:
-                st.write("")
-                st.markdown("#### Layer B — Reflection prompt")
-                st.caption("Run after completing Layer A and reviewing the artifacts.")
-                st.markdown(layers["B"])
-            if "C" in layers:
-                st.write("")
-                st.markdown("#### Layer C — Customization")
-                st.caption("Optional extension.")
-                st.markdown(layers["C"])
-            with st.expander("Full prompt file", expanded=False):
-                st.markdown(content)
-        else:
-            st.markdown(content)
+    st.divider()
+    st.markdown(
+        '<div style="font-size:0.90rem;font-weight:700;color:#0F172A;margin-bottom:10px">Session Archives</div>'
+        '<div style="font-size:0.82rem;color:#64748B;margin-bottom:10px">Snapshots saved when you ran Archive & Reset.</div>',
+        unsafe_allow_html=True,
+    )
+    render_session_archive_section()
