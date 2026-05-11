@@ -39,7 +39,6 @@ data/external/
 *.swp
 *.swo
 *~
-.vscode/settings.json
 
 # Demo / scratch outputs (not the graded outputs/ folder)
 demo_outputs/

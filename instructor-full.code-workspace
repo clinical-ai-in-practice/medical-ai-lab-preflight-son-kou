@@ -1,0 +1,29 @@
+{
+  "folders": [
+    {
+      "name": "Medical AI Lab — Full View",
+      "path": "."
+    }
+  ],
+  "settings": {
+    // ── Instructor / full view ─────────────────────────────────────────────────
+    // Shows all files including support scaffold, dashboard source, tests,
+    // scripts, grading infrastructure, and instructor reference documents.
+    // Use this when setting up the course, debugging the system, or reviewing
+    // student work against the full repo structure.
+
+    "files.exclude": {
+      // Only hide runtime-generated ephemeral state that is never manually edited
+      ".venv/":              true,
+      ".pytest_cache/":      true
+    },
+
+    "search.exclude": {
+      ".venv/":              true,
+      ".pytest_cache/":      true
+    },
+
+    "explorer.compactFolders": false,
+    "editor.minimap.enabled": true
+  }
+}

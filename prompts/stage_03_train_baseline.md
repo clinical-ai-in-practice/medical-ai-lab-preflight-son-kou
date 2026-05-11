@@ -1,88 +1,108 @@
-# Stage 03 — Train Baseline
-## Mission 2: Build the First Detector
+# Mission 2 — Build the First Detector (Part 2): Train and Evaluate
 
-## Goal
+## What this mission is about
 
-Run the smallest deterministic baseline model and record the first quantitative metric.
-The goal is **not** a high Dice score. The goal is a reproducible starting point
-that you understand and can explain.
+Every comparison you will make in this lab depends on this baseline being
+correct and reproducible. The goal is not a high Dice score — it is a score
+you can explain. A reproducible baseline with an honest number is more
+scientifically valuable than an optimized number you cannot trace.
 
-Every number this stage produces is the reference point for everything that follows.
-If you cannot explain the baseline, you cannot meaningfully evaluate any improvement.
+---
 
-## Layer A — Base prompt
+## Prompt Principle: Specify evaluation criteria, not just execution
 
-> "Run `make smoke-train`. Then open `outputs/metrics/val_metrics.json`,
-> `outputs/figures/loss_curve.png`, and `reports/train_notes.md`. Explain to me:
-> - what algorithm was used and why it was chosen as the baseline
-> - what the Dice score means in plain language — what would 0.0 look like? What would 1.0?
-> - whether the loss curve looks like the training converged or is still decreasing
-> - whether this Dice score is better or worse than you expected, given the data you saw in Stage 02"
+A prompt that names the exact metric, its formula, and its required range
+makes Claude's evaluation verifiable. Without specifying "Dice score, range
+0–1," Claude might compute a different metric, compute it incorrectly, or
+report it in a way that cannot be compared across runs.
 
-## What this stage produces
+---
 
-| Artifact | Description |
-|---|---|
-| `outputs/metrics/val_metrics.json` | `{"dice": <float 0–1>}` — the primary baseline metric |
-| `outputs/figures/loss_curve.png` | Training loss over iterations |
-| `reports/train_notes.md` | Written summary: algorithm, Dice result, convergence, interpretation |
-| `outputs/status/stage_03_train_baseline.json` | `{"status":"ok","dice":...,"n_slices":...}` |
+## Layer A — Base Prompt
 
-## Files
+> I need to train a baseline segmentation model on the imaging data in `data/sample/`
+> and record the first quantitative result.
+>
+> Please do the following:
+>
+> 1. Look at what training code exists in `scripts/run_train.py`. If it needs
+>    to be created or completed, write it now. The training should:
+>    - Use a simple, deterministic model (a threshold, a basic U-Net-style architecture,
+>      or the simplest approach that produces a mask)
+>    - Set a fixed random seed (42) for reproducibility
+>    - Run inference on the validation slices
+>    - Compute Dice score for each slice and report the mean
+>
+> 2. Run the training/evaluation and tell me:
+>    - How many slices were used for training and validation
+>    - The mean Dice score on the validation set
+>    - What model architecture or method was used
+>
+> 3. Save a loss or training curve to `outputs/figures/loss_curve.png`.
+>
+> 4. Write a training notes report to `reports/train_notes.md` with:
+>    - Model description
+>    - Training parameters (learning rate, epochs if applicable, seed)
+>    - Validation Dice score
+>    - Any observations about convergence or model behavior
+>
+> 5. Write a metrics file to `outputs/metrics/val_metrics.json`:
+>    `{"dice": <value>, "n_slices": N}`
+>
+> 6. Write a status file to `outputs/status/stage_03_train_baseline.json`:
+>    `{"status": "ok", "dice": <value>, "n_slices": N}`
+>
+> The Dice score must be a real number between 0 and 1. Do not fabricate it.
 
-**Allowed to edit:** `scripts/run_train.py`, `reports/train_notes.md`
+---
 
-**Protected — do not modify:** `outputs/metrics/val_metrics.json` (written by the script — do not edit by hand),
-`tests/`, `artifacts/schema.json`, `prompts/`
+## Required outputs
 
-## Check
+| File | Minimum content |
+|------|-----------------|
+| `outputs/figures/loss_curve.png` | Training or evaluation curve figure |
+| `reports/train_notes.md` | Model description, parameters, Dice result, observations |
+| `outputs/metrics/val_metrics.json` | `{"dice": <float 0–1>, "n_slices": N}` |
+| `outputs/status/stage_03_train_baseline.json` | `{"status": "ok", "dice": <float>, "n_slices": N}` |
 
-```bash
-make smoke-train
-# Expected: prints Dice score and confirms metric files were written
-# Then verify:
-cat outputs/metrics/val_metrics.json          # dice key, value between 0 and 1
-ls -lh outputs/figures/loss_curve.png         # should be non-empty
-cat reports/train_notes.md
-```
+---
 
-**What to inspect manually:**
-- `outputs/metrics/val_metrics.json` — is the `dice` value a float between 0 and 1?
-  If it is exactly 0.0 or exactly 1.0, investigate before continuing.
-- `outputs/figures/loss_curve.png` — does the loss decrease and flatten, or is it erratic?
-  A loss that never decreases suggests a problem with the training setup.
-- `reports/train_notes.md` — does the written interpretation match the actual number?
-  If the Dice is 0.15 but the report says "good performance," that is a honesty violation.
+## Layer B — Reflection Prompt
 
-## Layer B — Reflection prompt
+> Look at the validation Dice score from `outputs/metrics/val_metrics.json`
+> and the training notes in `reports/train_notes.md`.
+>
+> Explain the result to me as if I were a **clinical collaborator** who knows
+> medicine but not machine learning:
+> - What does a Dice score of [X] mean in practical terms?
+> - Is this result good, poor, or uncertain? What would a meaningful threshold be?
+> - What is the single most likely reason this baseline does not perform better?
+> - What would need to change for this model to be useful in a real clinical workflow?
 
-After reviewing the metric, loss curve, and report, ask Claude:
+---
 
-> "Given a Dice score of [paste the actual value here]:
-> - Is this what you would expect from a simple threshold-based baseline on this dataset?
-> - What is the most likely cause of the error that Dice does not capture?
-> - If I had to explain this result to a clinician who had never heard of Dice score,
->   what would I say?
-> Add a section called '## Clinical interpretation' to `reports/train_notes.md`
-> that answers this last question in 2–3 sentences."
+## Layer C — Exploration Challenge
 
-## Layer C — What you can customize
+> Try one modification to the baseline to see if performance changes:
+>
+> - Change one hyperparameter (e.g., threshold value, number of training epochs,
+>   or normalization method) and re-evaluate.
+> - Document the result: what changed, what happened to Dice, and whether the
+>   change was positive, negative, or negligible.
+>
+> Do NOT overwrite `outputs/metrics/val_metrics.json` — save the exploration result
+> to `outputs/metrics/baseline_exploration.json` so the canonical baseline is preserved.
+>
+> *Why this matters: a controlled single-variable change is the foundation of
+> Mission 4. Practice it now.*
 
-The baseline uses a fixed threshold. Ask Claude what happens if you change the threshold
-value by a small amount — does the Dice score improve or degrade? This is not a required
-change; it is a quick manual experiment to build intuition before Stage 04.
+---
 
 ## Discussion questions
 
-- The Dice score is computed on the teaching pack sample.
-  Is this an in-sample estimate or an out-of-sample estimate? Why does the distinction matter?
-- If the loss curve flattens but Dice is still low, what does that tell you about the
-  relationship between the training objective and the evaluation metric?
-- What would it mean if two very different models produced the same Dice score on this sample?
-  Would you trust them equally?
-- Why is it important to record the baseline *before* attempting any improvement?
-
-## What comes next
-
-Stage 04 investigates where the baseline fails — slice by slice, error type by error type.
-The Dice score you recorded here will appear again in Stage 05 as the comparison reference.
+- Why does the prompt require a fixed random seed? What would happen to reproducibility
+  without one?
+- What is the difference between training loss and validation Dice? Why does validation
+  Dice matter more for evaluating model quality?
+- If the Dice score is 0.05, should you move forward to Mission 3 or investigate first?
+  What would you look for?

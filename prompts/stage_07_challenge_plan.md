@@ -1,83 +1,126 @@
-# Stage 07 — Challenge Plan
-## Mission 5: Design the Next Study
+# Mission 5 — Design the Next Study (Part 1): Research Plan
 
-## Goal
+## What this mission is about
 
-Before writing any code, produce a concrete written plan for the Day 2 challenge:
-replacing the fixed threshold with per-slice Otsu adaptive thresholding.
+Before writing any code, write the plan. Research planning is a distinct skill
+from execution. A written study design forces clarity about what you believe
+before you commit to implementation — and gives you something to compare against
+when the result arrives.
 
-Research planning is a distinct skill from execution. A written plan forces clarity
-about what you believe and why — before you commit to any implementation.
-Planning before acting is a required step, not a formality.
+This mission teaches **structured study design**: not just "what will I try next"
+but "what question am I asking, what would count as an answer, and what could
+make me wrong."
 
-## Layer A — Base prompt
+---
 
-> "Run `make challenge-plan`. Then open `reports/challenge_plan.md` and tell me:
-> - what weakness in the Day 1 baseline the plan is targeting
-> - why Otsu's method is the proposed solution for that weakness
-> - what the comparison will control for (what stays the same between baseline and Day 2)
-> - what the two main risks are if the assumption turns out to be wrong
-> Does the plan look grounded in the actual Day 1 Dice numbers, or is it generic?"
+## Prompt Principle: Plan before code
 
-## What this stage produces
+Asking Claude to write a structured plan first — before any implementation —
+forces it to reason through the approach and surface assumptions. The plan
+becomes the check on whether the implementation drifted from intent.
+Code written without a plan is hard to evaluate. Code written after a plan
+is testable against it.
 
-| Artifact | Description |
-|---|---|
-| `reports/challenge_plan.md` | Written plan: weakness identified, proposed change, controlled comparison, risks, success criteria |
-| `outputs/status/stage_07_challenge_plan.json` | `{"status":"ok","proposed_change":"...","baseline_dice":…}` |
+---
 
-## Files
+## Layer A — Base Prompt
 
-**Allowed to edit:** `scripts/challenge_plan.py`, `reports/challenge_plan.md`
+> Based on everything from Day 1, I need to design a study plan for Day 2.
+> Before writing any code, I want a structured research design document.
+>
+> Please do the following:
+>
+> 1. Read `reports/day1_summary.md` and `reports/error_analysis.md`.
+>    Remind me of the open questions and the hypothesis that was not fully resolved.
+>
+> 2. Write a Day 2 Challenge Plan to `reports/challenge_plan.md` using this structure:
+>
+>    `# Day 2 Challenge Plan`
+>
+>    `## Identified Weakness`
+>    What specific limitation of the Day 1 pipeline are you targeting?
+>    Cite evidence from the error analysis.
+>
+>    `## Research Question`
+>    State the question as: "Does [intervention X] improve [metric Y] compared to [baseline Z]
+>    in [context C]?"
+>
+>    `## Proposed Method`
+>    What change to the pipeline will you make? Be specific: name the component,
+>    the change, and why you expect it to help.
+>
+>    `## What Would Count as Success`
+>    A specific, measurable criterion. Example: "Dice improves by > 0.05 on the validation set."
+>    Not: "performance gets better."
+>
+>    `## Risks and Failure Conditions`
+>    What could go wrong? What would it mean if the result is negative?
+>    Is there a result that would cause you to abandon this direction?
+>
+>    `## What I Would Try Next if This Fails`
+>    Name one alternative direction.
+>
+> 3. Write a status file to `outputs/status/stage_07_challenge_plan.json`:
+>    `{"status": "ok", "identified_weakness": "...", "proposed_change": "..."}`
+>
+> The plan should be analytical. "Try a better model" is not a research question.
+> "Does replacing the threshold with a learned U-Net decoder improve Dice by >0.05
+> on the FLAIR segmentation task?" is a research question.
 
-**Protected — do not modify:** `reports/day1_summary.md` (Day 1 record — do not overwrite),
-all `outputs/metrics/` from Day 1, `tests/`, `artifacts/schema.json`, `prompts/`
+---
 
-## Check
+## Required outputs
 
-```bash
-make challenge-plan
-# Prints: identified weakness, proposed Day 2 change
-# Open: reports/challenge_plan.md — confirm it references actual Day 1 Dice numbers
-```
+| File | Minimum content |
+|------|-----------------|
+| `reports/challenge_plan.md` | All 6 sections, > 200 chars, `# Day 2 Challenge Plan` header |
+| `outputs/status/stage_07_challenge_plan.json` | `{"status": "ok", "identified_weakness": "...", "proposed_change": "..."}` |
 
-**What to inspect manually:**
-- Does `reports/challenge_plan.md` include the `# Day 2 Challenge Plan` header? (grading requires it)
-- Does the plan reference a specific Day 1 Dice value — not a generic description?
-  If the plan reads as if it could have been written without running Day 1, it is not grounded.
-- Does the plan identify what "success" looks like for the Day 2 experiment?
+---
 
-## Layer B — Reflection prompt
+## Layer B — Reflection Prompt
 
-After reviewing the plan, ask Claude:
+> Read `reports/challenge_plan.md` from the perspective of two different reviewers:
+>
+> **As a methods reviewer:** Is the proposed method change specific enough to be reproducible?
+> If someone else read this plan, could they implement the same experiment?
+>
+> **As a devil's advocate:** What is the strongest argument that this plan will fail?
+> What assumption in the plan is most likely to be wrong?
+> What would you change about the study design to make it more robust?
+>
+> Update `reports/challenge_plan.md` with a `## Critique Response` section that
+> addresses the strongest objections to the plan.
 
-> "Test this plan for scientific rigour:
-> - Is the comparison fair? What exactly will be held constant between the Day 1 baseline
->   and the Day 2 Otsu-based approach?
-> - Otsu's method assumes a bimodal intensity histogram. Does the data we saw in Stage 02
->   support that assumption? Which slices are most likely to violate it?
-> - What would a negative result look like — and how would you report it honestly?
-> Add a section called '## Success criteria and failure conditions' to `reports/challenge_plan.md`
-> that addresses these questions in concrete terms."
+---
 
-## Layer C — What you can customize
+## Layer C — Exploration Challenge
 
-Ask Claude: "What other threshold strategies could we have chosen instead of Otsu's method?"
-Then ask it to write a one-paragraph rationale for why Otsu was selected over each alternative.
-This is not required for grading but is a good scientific exercise — and makes the final
-translation memo stronger.
+> Extend the study design with a **role-switching exercise**:
+>
+> Ask Claude to answer these two questions in separate paragraphs in the report:
+>
+> *As the algorithm designer:* What is the most technically promising change you
+> could make to improve performance on the identified weakness?
+>
+> *As a clinical safety reviewer:* What change from the day 1 pipeline would you
+> most want validated before this system gets closer to clinical use?
+>
+> Do the two perspectives agree on what to prioritize? If not, how would you
+> decide between them?
+>
+> Add a `## Perspective Analysis` section to `reports/challenge_plan.md` with this content.
+>
+> *Why this matters: in clinical AI, technical performance and clinical safety are
+> different optimization objectives. Recognizing when they conflict is essential.*
+
+---
 
 ## Discussion questions
 
-- Does the plan commit to a fair comparison? What stays constant between the baseline
-  and the Day 2 adaptation, and what changes?
-- Otsu's method assumes a bimodal intensity histogram. For which slices in this dataset
-  is that assumption most likely to fail — and does that matter for interpreting the result?
-- What would a failed Day 2 experiment look like, and how would you report it differently
-  from a succeeded one?
-
-## What comes next
-
-Stage 08 implements the plan exactly as written. If the implementation deviates from the plan,
-you should update `reports/challenge_plan.md` to reflect what was actually done.
-Stage 09 then assembles the final clinical translation memo using all Day 1 and Day 2 results.
+- What is the difference between a "proposed change" and a "research question"?
+  Why does the structure ask for both?
+- The "Risks and Failure Conditions" section asks what a negative result would mean.
+  Why is this important to think about *before* running the experiment?
+- How does writing "What Would Count as Success" before running the experiment
+  protect against p-hacking or motivated reasoning?
