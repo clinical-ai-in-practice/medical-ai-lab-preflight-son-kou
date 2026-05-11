@@ -2,149 +2,95 @@
 
 **PhD Course: Medical AI + Agentic Coding for Clinical Research**
 
-This is your personal lab workspace for a two-day research training experience in medical image AI. You are positioned as a **junior clinical AI investigator**. Your goal is to build a reproducible segmentation pipeline, investigate its failures, make one justified improvement, and produce written outputs suitable for clinical discussion.
+> **Open in VS Code:** double-click `student-lab.code-workspace` — this gives you the intended student-facing view. Do not open the raw folder directly.
 
-You do not need traditional programming fluency. You work by writing structured prompts in **VS Code + Claude Code**, guided by a local dashboard that shows your current mission, required artifacts, and progress.
+You are positioned as a **junior clinical AI investigator**. Over seven missions you will build a medical image segmentation prototype, investigate its failures, make one justified improvement, and produce written outputs suitable for clinical discussion.
+
+You do not need traditional programming fluency. You work by writing structured prompts in **VS Code + Claude Code**, guided by a local dashboard.
 
 ---
 
-## How the lab works
+## Start here
 
-The lab is organized as a sequence of research **missions**, not a list of scripts to execute. Each mission has a clear scientific goal, a set of expected artifacts, and a completion state you can verify.
+```bash
+pip install -r requirements.txt   # install dependencies (one-time)
+make preflight                    # confirm environment is intact
+make fetch-sample                 # download the teaching data
+make dashboard                    # open the mission dashboard
+```
 
-The primary loop for every mission is:
+---
+
+## The loop
+
+Every mission follows the same rhythm:
 
 > **dashboard → prompt → VS Code + Claude Code → artifact → dashboard**
 
 1. Open the dashboard (`make dashboard`) and read the current mission.
-2. Copy or adapt the mission prompt shown in the dashboard's Prompt Studio tab.
-3. Go to VS Code + Claude Code and run the prompt-driven task.
-4. Return to the dashboard and inspect the new artifacts, metrics, and feedback.
+2. Copy the prompt shown in the dashboard into your Claude Code session.
+3. Let Claude run the task — it reads the repo, writes or extends scripts, produces artifacts.
+4. Return to the dashboard and inspect the new outputs.
 5. When the mission checklist shows complete, create a checkpoint commit and push.
 
-**The dashboard is your navigation and feedback console.** It shows mission guidance, artifact previews, and submission readiness. Claude interaction happens in VS Code + Claude Code — not in the dashboard.
+The dashboard is your **navigation and feedback console**. All Claude interaction happens in VS Code + Claude Code — not in the dashboard.
 
 ---
 
-## First 10 minutes
+## What you generate
 
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Structural preflight check — confirms environment and scaffolding (no data needed)
-make preflight
-
-# 3. Download the teaching data sample
-make fetch-sample
-
-# 4. Open the mission dashboard
-make dashboard
-```
-
-If `make preflight` and `make fetch-sample` complete without errors, you are ready to begin Mission 2.
-
-> **Note:** `make preflight` bootstraps the environment and runs a quick structural check. Run it before `make fetch-sample` to catch any missing dependencies early.
-
----
-
-## Mission sequence
-
-### Day 1 — Build a reproducible baseline
-
-| Mission | Scientific goal | Key artifacts |
-|---|---|---|
-| Mission 0 — Wake the Lab | Environment setup, first prompt-driven success | `reports/env_check.md` |
-| Mission 1 — Receive the Signal | Fetch teaching pack, inspect dataset | `data/sample/`, `reports/data_notes.md` |
-| Mission 2 — Build the First Detector | Baseline model, first meaningful metric | `outputs/metrics/val_metrics.json`, `reports/train_notes.md` |
-| Mission 3 — Investigate Failure | Error analysis, hypothesis formation | `reports/error_analysis.md`, error figures |
-| Mission 4 — Improve With Intent | One controlled improvement, measured comparison | `outputs/metrics/model_swap_comparison.json`, `reports/model_swap.md` |
-| Mission 5 — Pack the Report | Day 1 summary | `reports/day1_summary.md` |
-
-### Day 2 — Tackle the harder challenge
-
-| Mission | Scientific goal | Key artifacts |
-|---|---|---|
-| Mission 5 — Design the Next Study | Challenge planning, pipeline adaptation | `reports/challenge_plan.md`, `reports/adapt_pipeline.md` |
-| Mission 6 — Translate Responsibly | Clinical gap, human oversight, translation memo | `reports/translation_memo.md` |
-
-Complete one mission before beginning the next. The dashboard's Evaluation tab shows which missions are complete.
-
----
-
-## How to use Claude Code
-
-Each mission has a prompt in `prompts/`. The workflow is:
-
-1. Read the mission prompt in the dashboard (Prompt Studio tab) or open the file directly.
-2. Paste or adapt it in your Claude Code session in VS Code.
-3. **Ask Claude to explain its plan before it edits anything.**
-4. Review the plan, ask questions, then let it proceed.
-5. Return to the dashboard to inspect the new artifacts.
-
-**Important rules:**
-- Never ask Claude to skip a mission or jump ahead
-- Never ask Claude to fabricate or invent metric values
-- If Claude's plan touches files you don't understand, ask it to explain them first
-- Push a checkpoint commit after each completed mission
-
----
-
-## Project layout
+This repo starts intentionally sparse. You and Claude gradually fill it in:
 
 ```
-prompts/          mission prompt files — read these to guide Claude Code
-scripts/          one Python script per mission stage — Claude extends these
+prompts/          read these to guide each mission
 outputs/
-  figures/        PNG figures produced by each mission
-  metrics/        JSON metric files (val_metrics.json, model_swap_comparison.json, ...)
-  status/         per-stage status files written by scripts — do not edit manually
-reports/          written summaries — you and Claude write these together
-data/sample/      teaching data (regenerated by make fetch-sample, not committed to git)
-app/              mission dashboard — open with make dashboard
-tests/            autograding tests
-artifacts/        output contract definition used by grading
-docs/             design spec and instructor reference docs
+  figures/        PNG figures — overlays, loss curves, error maps
+  metrics/        JSON metric files — dice scores, comparisons
+  status/         per-stage completion checks
+reports/          written mission summaries
 ```
 
----
-
-## What gets graded
-
-Grading checks that your repository contains the required artifacts with correct structure. See [ASSIGNMENT.md](ASSIGNMENT.md) for the full mission sequence, artifact requirements, and evaluation criteria.
-
-Quick check: `make test` runs the **same 67 tests** that CI runs on every push. When all pass locally, your push will be green. The dashboard's Evaluation tab shows the same checks in real time.
+`outputs/` and `reports/` are empty at the start. Filling them is the lab.
 
 ---
 
-## Command reference
+## Missions
 
-These commands are how the pipeline executes underneath the mission-based workflow. The dashboard guides when to use them; you do not need to run them in order manually.
+| Mission | Goal | Key output |
+|---|---|---|
+| 0 — Wake the Lab | Environment setup | `reports/env_check.md` |
+| 1 — Receive the Signal | Fetch and inspect the dataset | `data/sample/` |
+| 2 — Build the First Detector | Baseline model + first metric | `outputs/metrics/val_metrics.json` |
+| 3 — Investigate Failure | Error analysis + hypothesis | `reports/error_analysis.md` |
+| 4 — Improve With Intent | One controlled improvement | `outputs/metrics/model_swap_comparison.json` |
+| 5 — Design the Next Study | Day 2 challenge plan + adaptation | `reports/challenge_plan.md` |
+| 6 — Translate Responsibly | Clinical translation memo | `reports/translation_memo.md` |
+
+Complete them in order. The dashboard unlocks the next mission when the current one passes.
+
+---
+
+## Using Claude Code
+
+- Paste prompts from the dashboard — they specify exactly what Claude may edit and what to produce.
+- Ask Claude to **state its plan before editing anything**.
+- Never ask Claude to fabricate metric values or skip a mission.
+- Push a checkpoint commit after each completed mission.
+
+See [ASSIGNMENT.md](ASSIGNMENT.md) for full artifact requirements and grading criteria.
+
+---
+
+## Commands
 
 ```bash
-# Dashboard and environment
-make dashboard        # Open mission dashboard (primary student interface)
-make preflight        # Structural checks — run first (no data needed)
-
-# Day 1 mission stages
-make bootstrap        # Mission 0 — environment setup
-make fetch-sample     # Mission 1 — fetch teaching pack
-make visualize        # Mission 2 — load data, produce overlay figures
-make smoke-train      # Mission 2 — run baseline model, write metrics
-make error-analysis   # Mission 3 — identify best and worst predictions
-make model-swap       # Mission 4 — make one controlled change, compare
-make pack-report      # Mission 5 — assemble Day 1 summary report
-
-# Day 2 mission stages
-make challenge-plan   # Mission 5/6 — write plan for harder challenge
-make adapt-pipeline   # Mission 5/6 — implement planned changes
-make translation-memo # Mission 6 — write clinical translation memo
-
-# Sequences
-make run-day1         # Missions 0–5, Day 1 stages in order
-make run-day2         # Missions 5–6, Day 2 stages in order
-
-# Testing
-make test             # Run autograding tests (same as CI)
-make help             # List all commands
+make dashboard        # open the mission dashboard (primary interface)
+make preflight        # structural check — run first, no data required
+make fetch-sample     # download the teaching dataset
+make test             # run autograding checks (same as CI)
+make help             # list all available commands
 ```
+
+---
+
+*This repo contains support scaffold for teaching infrastructure and autograding. It is hidden from the workspace view by default and does not affect student work.*

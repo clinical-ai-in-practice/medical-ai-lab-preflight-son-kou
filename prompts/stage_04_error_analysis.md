@@ -1,81 +1,104 @@
-# Stage 04 — Error Analysis
-## Mission 3: Investigate Failure
+# Mission 3 — Investigate Failure
 
-## Goal
-
-Understand where the baseline segmentation succeeds and where it fails —
-slice by slice, error type by error type — and produce figures and a report
-that make the error pattern concrete and interpretable.
+## What this mission is about
 
 Blind improvement without error understanding is engineering guesswork, not science.
-The hypothesis you form here determines whether Mission 4 is a valid experiment.
+Before you change anything about the model, you need to understand *where* and *why*
+it fails — slice by slice, case by case. The hypothesis you form here determines
+whether Mission 4 is a valid controlled experiment or random tweaking.
 
-## Layer A — Base prompt
+---
 
-> "Run `make error-analysis`. Then open `reports/error_analysis.md`,
-> `outputs/figures/error_analysis_best.png`, and `outputs/figures/error_analysis_worst.png`.
-> Explain to me in plain language:
-> - which slice was the best case and why the threshold worked there
-> - which slice was the worst case and why the threshold failed there
-> - what the error map colours mean (TP/FP/FN)
-> - what this error pattern suggests we should try in Stage 05"
+## Prompt Principle: Observation → hypothesis
 
-## What this stage produces
+Asking Claude to first observe (rank predictions, visualize failures) and then form
+a hypothesis (what is the dominant failure mode?) forces it to ground its explanation
+in evidence. A prompt that asks for a hypothesis *before* evidence invites speculation.
+Always sequence: look first, explain second.
 
-| Artifact | Description |
-|---|---|
-| `outputs/figures/error_analysis_best.png` | 4-panel figure: image / GT mask / prediction / error map |
-| `outputs/figures/error_analysis_worst.png` | Same layout for the worst-case slice |
-| `reports/error_analysis.md` | Written analysis with TP/FP/FN counts and a failure hypothesis |
-| `outputs/status/stage_04_error_analysis.json` | `{"status":"ok","best_case":{...},"worst_case":{...}}` |
+---
 
-## Files
+## Layer A — Base Prompt
 
-**Allowed to edit:** `scripts/error_analysis.py`, `reports/error_analysis.md`
+> I need to understand where my baseline segmentation model is failing.
+>
+> Please do the following:
+>
+> 1. Load the baseline model results. Look at `outputs/metrics/val_metrics.json`
+>    and `outputs/status/stage_03_train_baseline.json` to understand what was trained.
+>    Examine `scripts/error_analysis.py` — create or complete it as needed.
+>
+> 2. Run per-slice Dice evaluation across all validation slices.
+>    Identify the best-performing slice and the worst-performing slice.
+>
+> 3. Create error visualizations:
+>    - One figure for the best-case prediction: image, ground truth, prediction, and error map
+>      (where TP=green, FP=red, FN=blue)
+>    - One figure for the worst-case prediction: same layout
+>    - Save to `outputs/figures/error_analysis_best.png` and `outputs/figures/error_analysis_worst.png`
+>
+> 4. Write an error analysis report to `reports/error_analysis.md` with:
+>    - Best-case and worst-case Dice scores
+>    - What the error patterns look like visually (describe what you see in the figures)
+>    - Your hypothesis: what is the dominant failure mode?
+>    - Your prediction: what kind of change would most likely improve the worst cases?
+>
+> 5. Write a status file to `outputs/status/stage_04_error_analysis.json` with:
+>    `{"status": "ok", "best_case": {"slice_idx": N, "dice": X}, "worst_case": {"slice_idx": N, "dice": X}, "n_slices": N}`
+>
+> Be specific in the error report. "The model does poorly on some slices" is not a hypothesis.
+> A hypothesis is: "The model over-segments in slices with low contrast at the boundary."
 
-**Protected — do not modify:** `outputs/status/stage_04_error_analysis.json` (written by the script),
-`tests/`, `artifacts/schema.json`, `prompts/`
+---
 
-## Check
+## Required outputs
 
-```bash
-make error-analysis
-# Prints: best-case slice index and Dice, worst-case slice index and Dice
-# Then open both PNG figures and read the report
-```
+| File | Minimum content |
+|------|-----------------|
+| `outputs/figures/error_analysis_best.png` | Best-case: image, GT, prediction, error map |
+| `outputs/figures/error_analysis_worst.png` | Worst-case: image, GT, prediction, error map |
+| `reports/error_analysis.md` | Best/worst Dice, visual description, failure hypothesis |
+| `outputs/status/stage_04_error_analysis.json` | `{"status": "ok", "best_case": {...}, "worst_case": {...}, "n_slices": N}` |
 
-**What to inspect manually:**
-- Open both figures side by side — can you see a visual pattern that explains the gap between best and worst case?
-- Read `reports/error_analysis.md` — does the written interpretation match what you see in the figures?
-  If the report says "FP dominates" but the error map shows FN in red, that is a contradiction worth raising with Claude.
+---
 
-## Layer B — Reflection prompt
+## Layer B — Reflection Prompt
 
-After reviewing the figures and the report, ask Claude:
+> Read `reports/error_analysis.md` and look at both error figures.
+>
+> Now put on two hats and give me two separate assessments:
+>
+> **As the developer:** What one code or algorithm change would you try first, based on the
+> error patterns? Be specific about what you would change and why you think it would help.
+>
+> **As the critic:** What weaknesses do you see in your own error analysis?
+> - Are there failure patterns you might be missing because of how the metric was computed?
+> - Is your hypothesis testable? How would you know if your proposed fix worked?
+> - What evidence would change your hypothesis?
 
-> "Based on the error maps for the best and worst case:
-> - What is the dominant error type — false positives or false negatives?
-> - Does the spatial distribution of errors suggest a problem with the threshold, the mask shape, or something else?
-> - Write a one-paragraph hypothesis at the end of `reports/error_analysis.md` under a heading called
->   '## Hypothesis for Stage 05'. The hypothesis should state: what you think the problem is,
->   what you will test, and what a positive result would look like."
+---
 
-## Layer C — What you can customize
+## Layer C — Exploration Challenge
 
-Ask Claude to identify a specific slice index that is neither the best nor the worst —
-a "middle case." Ask it to explain why this slice performed as it did relative to the other two.
-Does the middle case support or challenge your hypothesis?
+> Extend the error analysis to find additional patterns:
+>
+> - Compute the Dice score distribution across all slices and plot a histogram.
+>   Save to `outputs/figures/dice_distribution.png`.
+> - Are the worst-case slices clustered (e.g., all from the same patient or same
+>   region), or random? If you can tell from the data, note it.
+> - What is the 10th percentile Dice score? How does it compare to the mean?
+>
+> Update `reports/error_analysis.md` with these distributional findings.
+>
+> *Why this matters: mean Dice hides tail failures. In clinical AI, worst-case
+> performance matters as much as average performance.*
+
+---
 
 ## Discussion questions
 
-- Is the Dice gap between best and worst case large enough to be clinically meaningful,
-  or is it within the range of sampling noise for a 10-slice dataset?
-- What type of error dominates in the worst case — false positives or false negatives?
-  Why does the answer matter for which post-processing step to try next?
-- If you had no quantitative metric and only the figures, could you still identify which
-  slice was best and which was worst? What does this tell you about visual inspection vs. metrics?
-
-## What comes next
-
-Stage 05 tests one specific, well-motivated change to address the dominant error pattern
-you identified here. The hypothesis written in this stage is what makes Stage 05 a valid experiment.
+- Why does the prompt ask Claude to "describe what you see in the figures" rather
+  than just create the figures?
+- What is the difference between a description ("the model does poorly in some regions")
+  and a hypothesis ("the model fails when the boundary contrast is below X")?
+- How would you test whether your hypothesis is correct in Mission 4?

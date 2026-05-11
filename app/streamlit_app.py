@@ -51,13 +51,33 @@ html, body, .stApp {
     max-width: none !important;
 }
 
-/* ── Sidebar — deep navy, high-contrast labels ───────────────────────────── */
+/* ── Sidebar — light cool grey, crisp borders ────────────────────────────── */
 section[data-testid="stSidebar"] {
-    background: #0B1526 !important;
-    border-right: none !important;
+    background: #F0F4F8 !important;
+    border-right: 1px solid #D6DFEA !important;
 }
 section[data-testid="stSidebar"] > div:first-child {
-    background: #0B1526 !important;
+    background: #F0F4F8 !important;
+}
+/* Sidebar text defaults */
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown span,
+section[data-testid="stSidebar"] label {
+    color: #334155 !important;
+}
+/* Sidebar dividers */
+section[data-testid="stSidebar"] hr {
+    border-color: #D6DFEA !important;
+}
+/* Sidebar expander */
+section[data-testid="stSidebar"] details[data-testid="stExpander"] > summary {
+    background: #E8EEF4 !important;
+    border-color: #D6DFEA !important;
+    color: #334155 !important;
+}
+section[data-testid="stSidebar"] details[data-testid="stExpander"] > div {
+    background: #F4F7FB !important;
+    border-color: #D6DFEA !important;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
@@ -614,6 +634,15 @@ small.stCaption { color: #94A3B8 !important; }
     cursor: pointer; border: 2px solid #2563EB !important;
 }
 
+/* Bonus challenge callout */
+.bonus-callout {
+    background: #FFFBEB; border: 1px solid #FDE68A; border-left: 4px solid #F59E0B;
+    border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 10px 0 4px 0;
+}
+.bonus-label { font-size: 0.72rem; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 3px 0; }
+.bonus-body  { font-size: 0.82rem; color: #78350F; margin: 0; line-height: 1.5; }
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -757,6 +786,8 @@ def init_session_state() -> None:
         st.session_state["checkpoint"] = None  # None | {"phase": "checking"|"result", "mission_idx": int, "passed": bool, "details": list}
     if "viewing_mission_idx" not in st.session_state:
         st.session_state["viewing_mission_idx"] = None  # None = current; int = revisit mode
+    if "tutorial_step" not in st.session_state:
+        st.session_state["tutorial_step"] = None  # None=not started; int=current step; "done"=completed
 
 # ── Mission definitions ───────────────────────────────────────────────────────
 
@@ -785,7 +816,8 @@ MISSIONS: list[dict] = [
         "expected_outputs": ["outputs/status/stage_00_bootstrap.json", "reports/env_check.md"],
         "make_commands":    ["make bootstrap"],
         "prompt_principle": "Explicit task + expected output",
-        "takeaway": "Numbering each step lets Claude track and report progress faithfully. Stating the expected output file prevents Claude from deciding what 'done' means.",
+        "takeaway": "Naming exact output file paths in your prompt creates a verifiable contract. Without them, Claude may write outputs anywhere or skip them entirely.",
+        "bonus_prompt": "Extend reports/env_check.md with hardware context: GPU availability, RAM, and disk space. Use psutil if available; note 'not checked' if not. A hardware summary is the first step toward realistic timeline estimation.",
     },
     {
         "label": "Mission 1 — Receive the Signal",
@@ -810,7 +842,8 @@ MISSIONS: list[dict] = [
         "expected_outputs": ["outputs/status/stage_01_fetch_sample.json", "data/sample/  (imaging dataset)"],
         "make_commands":    ["make fetch-sample"],
         "prompt_principle": "File permission scope + state assertion",
-        "takeaway": "Telling Claude exactly which files it may touch prevents side effects. Asserting the expected state ('data/sample/ should contain N cases') forces explicit validation rather than silent completion.",
+        "takeaway": "Telling Claude which files it may touch prevents side effects. Asserting expected state ('confirm N slices were loaded') forces explicit validation rather than silent completion.",
+        "bonus_prompt": "Load the first image and mask array. Report shape, dtype, value range, and mask foreground fraction. Write these statistics to reports/data_notes.md as a preliminary data characterization.",
     },
     {
         "label": "Mission 2 — Build the First Detector",
@@ -834,8 +867,9 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/figures/sample_overlay.png", "outputs/figures/loss_curve.png", "outputs/metrics/val_metrics.json", "outputs/status/stage_02_load_visualize.json", "outputs/status/stage_03_train_baseline.json"],
         "make_commands":    ["make visualize", "make smoke-train"],
-        "prompt_principle": "Stage sequencing + artifact contract",
-        "takeaway": "Listing expected output files as a contract — not a description — means Claude produces exactly what the evaluation checks. The sequence (visualize, then train) prevents Claude from skipping steps to save time.",
+        "prompt_principle": "Inspect before you act",
+        "takeaway": "Asking Claude to describe what it sees in the data before creating outputs grounds its work in evidence. The interpretation is as important as the figure.",
+        "bonus_prompt": "Create a multi-slice overview figure showing at least 3 slices with mask overlays. Save to outputs/figures/multi_slice_overview.png. Note whether mask coverage varies across slices — variation reveals dataset heterogeneity.",
     },
     {
         "label": "Mission 3 — Investigate Failure",
@@ -858,8 +892,9 @@ MISSIONS: list[dict] = [
         "protected_files": ["CLAUDE.md", "ASSIGNMENT.md", "tests/", "prompts/", "artifacts/schema.json"],
         "expected_outputs": ["outputs/figures/error_analysis_best.png", "outputs/figures/error_analysis_worst.png", "outputs/status/stage_04_error_analysis.json", "reports/error_analysis.md"],
         "make_commands":    ["make error-analysis"],
-        "prompt_principle": "Observation → hypothesis framing",
-        "takeaway": "Asking Claude to 'form a hypothesis from the worst-case examples' shifts it from summarizing to reasoning. The prompt forces Claude to commit to a testable claim, not just describe what it sees.",
+        "prompt_principle": "Observation → hypothesis",
+        "takeaway": "Sequencing observe-first, explain-second forces evidence-grounded reasoning. A prompt that asks for a hypothesis before observation invites speculation, not science.",
+        "bonus_prompt": "Compute the Dice score distribution across all validation slices and plot a histogram. Save to outputs/figures/dice_distribution.png. What is the 10th percentile Dice? How does it compare to the mean? Update reports/error_analysis.md with distributional findings.",
     },
     {
         "label": "Mission 4 — Improve With Intent",
@@ -884,7 +919,8 @@ MISSIONS: list[dict] = [
         "expected_outputs": ["outputs/metrics/model_swap_comparison.json", "outputs/figures/model_swap_comparison.png", "outputs/status/stage_05_model_swap.json", "reports/model_swap.md", "reports/day1_summary.md", "outputs/status/stage_06_pack_report.json"],
         "make_commands":    ["make model-swap", "make pack-report"],
         "prompt_principle": "Control variable framing",
-        "takeaway": "Specifying 'change only X, hold everything else constant' is not micromanagement — it is experimental design. A prompt that names the control variable produces a comparable result; one that doesn't produces uninterpretable noise.",
+        "takeaway": "Naming the control variable in your prompt is experimental design, not micromanagement. Without it, Claude may change multiple things and produce an uninterpretable result.",
+        "bonus_prompt": "Try one additional variation — a different improvement direction than the one tested. Save to outputs/metrics/model_swap_v2.json (same schema). In reports/model_swap.md, add a section comparing both variations. Which produced better results? Does combining both help or hurt?",
     },
     {
         "label": "Mission 5 — Design the Next Study",
@@ -909,7 +945,8 @@ MISSIONS: list[dict] = [
         "expected_outputs": ["outputs/status/stage_07_challenge_plan.json", "reports/challenge_plan.md", "outputs/metrics/challenge_comparison.json", "outputs/figures/challenge_comparison.png", "outputs/status/stage_08_adapt_pipeline.json", "reports/adapt_pipeline.md"],
         "make_commands":    ["make challenge-plan", "make adapt-pipeline"],
         "prompt_principle": "Plan before code",
-        "takeaway": "Asking Claude to write a plan first — before any implementation — forces it to reason through the approach and surface assumptions. The plan becomes the check on whether the implementation drifted from intent.",
+        "takeaway": "A plan written before the experiment is the benchmark for judging the result. Code written without a plan is unverifiable. The plan also teaches role-switching: designer and critic are different perspectives.",
+        "bonus_prompt": "Add a role-switching exercise to reports/challenge_plan.md. Ask Claude: (1) as the algorithm designer — what is the most technically promising change? (2) as a clinical safety reviewer — what change would you most want validated before clinical use? Do the two perspectives agree on priority?",
     },
     {
         "label": "Mission 6 — Translate Responsibly",
@@ -934,7 +971,8 @@ MISSIONS: list[dict] = [
         "expected_outputs": ["outputs/status/stage_09_translation_memo.json", "reports/translation_memo.md"],
         "make_commands":    ["make translation-memo"],
         "prompt_principle": "Honesty constraint + audience framing",
-        "takeaway": "Telling Claude 'write this for a clinical collaborator who is not an ML expert, and do not overstate prototype capabilities' shapes both honesty and register. Without audience framing, Claude defaults to technical optimism.",
+        "takeaway": "Without 'do not overstate capabilities' and an explicit audience, Claude defaults to technical optimism. Both constraints shape register and honesty simultaneously.",
+        "bonus_prompt": "Write a second, more optimistic version of the memo at reports/translation_memo_optimistic.md. Then write reports/translation_comparison.md analyzing which version is appropriate for: a conference abstract, an FDA submission, a patient conversation. What specifically differs between the two versions?",
     },
 ]
 
@@ -1145,6 +1183,282 @@ def do_full_reset(state: dict) -> dict:
     return fresh
 
 
+# ── Tutorial debug flag ───────────────────────────────────────────────────────
+TUTORIAL_DEBUG = False
+
+_TUTORIAL_STEPS: list[dict] = [
+    {
+        "title": "Welcome to the Medical AI Lab",
+        "body": (
+            "You are a junior clinical AI investigator. Over 7 missions you will build, "
+            "evaluate, and translate a medical image segmentation prototype — using "
+            "natural-language prompts to direct Claude throughout. This tour takes 2 minutes."
+        ),
+        "target": None,
+    },
+    {
+        "title": "Your current mission",
+        "body": (
+            "The mission header shows where you are in the sequence. "
+            "The blue number badge is your mission index. Stage pills below the title "
+            "show which stages are done (green) and which are next (blue)."
+        ),
+        "target": "mission-header",
+    },
+    {
+        "title": "The prompt is your instrument",
+        "body": (
+            "Copy the prompt block into VS Code, open Claude Code (run <code>claude</code> "
+            "in the terminal), and paste. Claude will read the repo, write scripts, and produce "
+            "the required artifacts. Better prompts &#8594; better experimental control."
+        ),
+        "target": "prompt-block",
+    },
+    {
+        "title": "Artifacts appear here after running",
+        "body": (
+            "Figures, metrics, and status files appear in the Artifacts panel "
+            "after Claude runs. Click <strong>&#8635; Refresh</strong> to re-scan outputs. "
+            "The Results tab shows all artifacts across all missions."
+        ),
+        "target": "artifacts",
+    },
+    {
+        "title": "Stage status is your ground truth",
+        "body": (
+            "Each stage has a status file. A green &#10003; means the file exists and is valid. "
+            "Stage status is the authoritative check &#8212; not what Claude said in chat. "
+            "Click a completed stage to preview its JSON."
+        ),
+        "target": "stage-status",
+    },
+    {
+        "title": "Check progress from the sidebar",
+        "body": (
+            "When Claude finishes in VS Code, return here and click "
+            "<strong>&#10003; I finished &#8212; check my progress</strong> in the sidebar. "
+            "This verifies all required artifacts and advances you if everything passes."
+        ),
+        "target": "sidebar-button",
+    },
+    {
+        "title": "Reflection unlocks after completion",
+        "body": (
+            "After all stages pass, the Reflection Prompt (Layer B) unlocks below the base prompt. "
+            "It asks you to interpret your results more deeply. "
+            "Layer C is an optional exploration challenge."
+        ),
+        "target": "reflection",
+    },
+]
+
+
+def _build_tutorial_focus_js(target: str) -> str:
+    """Build the minimal iframe HTML that applies CSS focus classes + scrollIntoView.
+
+    This component does EXACTLY three things:
+    1. Inject one <style> block into parent <head> (once, idempotent)
+    2. Add 'tut-mode' to parent body, 'tut-focus' to the active target element
+    3. Call scrollIntoView on the target if it is below the viewport fold
+
+    It does NOT inject a card. It does NOT wire any buttons. It does NOT proxy any clicks.
+    Tutorial navigation is 100% handled by native Streamlit buttons in render_tutorial_nav().
+    """
+    show_debug = "true" if TUTORIAL_DEBUG else "false"
+    target_safe = target.replace("'", "\\'")
+
+    return f"""<!DOCTYPE html>
+<html><head><style>body{{margin:0;padding:0;overflow:hidden}}</style></head>
+<body><script>
+(function() {{
+  var WIN = window.parent;
+  var PDOC;
+  try {{ PDOC = WIN.document; }}
+  catch(e) {{
+    document.body.textContent = 'ERR: ' + e;
+    return;
+  }}
+
+  var TARGET   = '{target_safe}';
+  var SHOW_DBG = {show_debug};
+
+  function dbg(msg) {{
+    if (!SHOW_DBG) return;
+    var d = PDOC.getElementById('tut-js-dbg');
+    if (!d) {{
+      d = PDOC.createElement('div');
+      d.id = 'tut-js-dbg';
+      d.style.cssText = 'position:fixed;bottom:8px;right:360px;z-index:10001;'
+        + 'background:#0d1117;color:#39d353;font-family:monospace;font-size:10px;'
+        + 'padding:6px 10px;border:1px solid #39d353;border-radius:4px;'
+        + 'max-width:320px;pointer-events:none;white-space:pre-wrap;';
+      PDOC.body.appendChild(d);
+    }}
+    d.textContent = 'JS: tgt=' + (TARGET||'none') + '\\n' + msg;
+  }}
+
+  // ── Inject focus CSS once ─────────────────────────────────────────────────
+  if (!PDOC.getElementById('tut-focus-style')) {{
+    var st = PDOC.createElement('style');
+    st.id  = 'tut-focus-style';
+    st.textContent =
+      'body.tut-mode [id^="tut-target-"]{{' +
+        'opacity:0.35;transition:opacity .2s,box-shadow .2s}}' +
+      'body.tut-mode [id^="tut-target-"].tut-focus{{' +
+        'opacity:1!important;' +
+        'outline:4px solid #F97316!important;outline-offset:5px!important;' +
+        'border-radius:8px!important;background:#FFFFFF!important;' +
+        'box-shadow:0 0 0 8px rgba(249,115,22,.15),0 4px 24px rgba(0,0,0,.07)!important}}';
+    PDOC.head.appendChild(st);
+    dbg('CSS injected');
+  }}
+
+  // ── Remove previous focus class, set new one ──────────────────────────────
+  PDOC.body.classList.add('tut-mode');
+  PDOC.querySelectorAll('.tut-focus').forEach(function(e) {{
+    e.classList.remove('tut-focus');
+  }});
+
+  if (TARGET) {{
+    var el = PDOC.getElementById('tut-target-' + TARGET);
+    if (el) {{
+      el.classList.add('tut-focus');
+      var r = el.getBoundingClientRect();
+      dbg('found  top=' + Math.round(r.top) + ' h=' + Math.round(r.height));
+      if (r.top < 0 || r.bottom > WIN.innerHeight) {{
+        el.scrollIntoView({{behavior:'smooth', block:'center'}});
+        dbg('scrolled');
+      }}
+    }} else {{
+      var ids = [];
+      PDOC.querySelectorAll('[id^="tut-target-"]').forEach(function(e){{ids.push(e.id);}});
+      dbg('NOT FOUND\\nexisting: ' + ids.join(', '));
+    }}
+  }}
+}})();
+</script></body></html>"""
+
+
+def _clear_tutorial_focus_js() -> str:
+    """Build the minimal iframe HTML that strips tut-mode / tut-focus from the parent DOM.
+
+    Called when tutorial ends (Skip / Finish). Removes body class, focus class,
+    and the JS debug panel.
+    """
+    return """<!DOCTYPE html>
+<html><head><style>body{margin:0;padding:0;overflow:hidden}</style></head>
+<body><script>
+(function() {
+  var PDOC;
+  try { PDOC = window.parent.document; } catch(e) { return; }
+  PDOC.body.classList.remove('tut-mode');
+  PDOC.querySelectorAll('.tut-focus').forEach(function(e){ e.classList.remove('tut-focus'); });
+  var d = PDOC.getElementById('tut-js-dbg');
+  if (d) d.remove();
+})();
+</script></body></html>"""
+
+
+def render_tutorial_nav(step: int) -> None:
+    """Render the tutorial guide card with native Streamlit navigation controls.
+
+    Architecture:
+    - The card header/content is HTML via st.markdown (styling only)
+    - Back / Next / Skip / Start Mission 0 are st.button() widgets
+    - st.button() clicks directly mutate st.session_state and call st.rerun()
+    - No hidden buttons, no JS click proxies, no DOM lookup for button text
+
+    A tiny components.html() handles ONLY CSS focus classes + scrollIntoView.
+    """
+    import streamlit.components.v1 as components
+
+    total   = len(_TUTORIAL_STEPS)
+    is_last = step >= total - 1
+    s       = _TUTORIAL_STEPS[min(step, total - 1)]
+    target  = s.get("target") or ""
+    pct     = int((step + 1) / total * 100)
+
+    if TUTORIAL_DEBUG:
+        st.caption(
+            f"Tutorial debug: active=True  step={step}/{total-1}"
+            f"  target={target or 'none'}  title={s['title'][:32]}"
+        )
+
+    # ── Guide card visual (HTML styling only — no interactive elements) ───────
+    st.markdown(
+        f'<div style="background:#FFFFFF;border:1.5px solid #2563EB;border-radius:14px;'
+        f'padding:20px 22px 14px 22px;margin-bottom:10px;'
+        f'box-shadow:0 4px 20px rgba(37,99,235,0.12),0 2px 8px rgba(0,0,0,0.06)">'
+
+        # Step badge + pct
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+        f'<span style="background:#EFF6FF;color:#1D4ED8;border-radius:20px;padding:3px 12px;'
+        f'font-size:0.62rem;font-weight:700;letter-spacing:0.10em;text-transform:uppercase">'
+        f'STEP {step + 1} / {total}</span>'
+        f'<span style="font-size:0.68rem;color:#94A3B8;font-weight:500">{pct}%</span>'
+        f'</div>'
+
+        # Progress bar
+        f'<div style="background:#E2E8F0;border-radius:4px;height:3px;margin-bottom:14px;overflow:hidden">'
+        f'<div style="background:linear-gradient(90deg,#2563EB,#60A5FA);height:100%;'
+        f'width:{pct}%;border-radius:4px"></div></div>'
+
+        # Title
+        f'<p style="font-size:0.96rem;font-weight:700;color:#0F172A;margin:0 0 8px 0;line-height:1.3">'
+        f'{s["title"]}</p>'
+
+        # Body
+        f'<p style="font-size:0.83rem;color:#475569;line-height:1.65;margin:0">'
+        f'{s["body"]}</p>'
+
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Native Streamlit navigation buttons ───────────────────────────────────
+    # Layout: [Back] [Skip] [Next →]  or  [Back] [Start Mission 0 →]
+    if is_last:
+        b_cols = st.columns([1, 2])
+        with b_cols[0]:
+            if step > 0:
+                if st.button("← Back", key="tut_back", use_container_width=True):
+                    st.session_state["tutorial_step"] = step - 1
+                    st.rerun()
+        with b_cols[1]:
+            if st.button("Start Mission 0 →", key="tut_finish",
+                         type="primary", use_container_width=True):
+                st.session_state["tutorial_step"] = "done"
+                st.session_state["entered_lab"]   = True
+                # Remove CSS focus state via a one-shot JS component
+                components.html(_clear_tutorial_focus_js(), height=0, scrolling=False)
+                st.rerun()
+    else:
+        b_cols = st.columns([1, 1, 2])
+        with b_cols[0]:
+            if step > 0:
+                if st.button("← Back", key="tut_back", use_container_width=True):
+                    st.session_state["tutorial_step"] = step - 1
+                    st.rerun()
+        with b_cols[1]:
+            if st.button("Skip", key="tut_skip", use_container_width=True):
+                st.session_state["tutorial_step"] = "done"
+                st.session_state["entered_lab"]   = True
+                components.html(_clear_tutorial_focus_js(), height=0, scrolling=False)
+                st.rerun()
+        with b_cols[2]:
+            if st.button("Next →", key="tut_next",
+                         type="primary", use_container_width=True):
+                st.session_state["tutorial_step"] = step + 1
+                st.rerun()
+
+    # ── Tiny JS: CSS focus classes + scrollIntoView only, no button wiring ────
+    components.html(
+        _build_tutorial_focus_js(target),
+        height=1,
+        scrolling=False,
+    )
+
+
 def attempt_git_checkpoint(mission_label: str) -> tuple[bool, str]:
     """Try to create a git checkpoint commit. Returns (success, message)."""
     try:
@@ -1205,51 +1519,139 @@ def run_mission_checkpoint(mission_idx: int, state: dict) -> dict:
 
 
 def render_checkpoint_panel(cp: dict) -> None:
-    """Render the mission completion checkpoint panel (animated progress → result)."""
-    phase = cp.get("phase", "result")
+    """Render the mission completion checkpoint panel (animated checks → rich result)."""
+    phase      = cp.get("phase", "result")
+    mission_idx = cp.get("mission_idx", 0)
+    mission     = MISSIONS[mission_idx]
 
     if phase == "checking":
+        # ── Animated item-by-item check sequence ────────────────────────────
         st.markdown(
-            '<div style="background:#EFF6FF;border:1.5px solid #93C5FD;border-radius:12px;padding:20px 24px;margin:8px 0 16px 0">'
-            '<p style="font-size:0.95rem;font-weight:700;color:#1E40AF;margin:0 0 10px 0">Running checkpoint checks…</p>'
-            '</div>',
+            f'<div style="background:#EFF6FF;border:1.5px solid #93C5FD;border-radius:12px;'
+            f'padding:20px 26px;margin:8px 0 16px 0">'
+            f'<p style="font-size:1.0rem;font-weight:700;color:#1E40AF;margin:0 0 4px 0">'
+            f'Checking {mission["label"]}…</p>'
+            f'<p style="font-size:0.82rem;color:#3B82F6;margin:0">Verifying stages and output artifacts</p>'
+            f'</div>',
             unsafe_allow_html=True,
         )
-        bar = st.progress(0)
-        mission   = MISSIONS[cp["mission_idx"]]
-        total     = len(mission["stages"]) + len(mission["expected_outputs"])
-        for i in range(total):
-            time.sleep(0.18)
-            bar.progress(int((i + 1) / total * 100))
-        bar.empty()
-        # Compute result
-        result = run_mission_checkpoint(cp["mission_idx"], st.session_state.get("lab_state", {}))
+        check_items = (
+            [(True, f"Stage: {s}") for s in mission["stages"]]
+            + [(True, f"Output: {out.split('/')[-1]}") for out in mission["expected_outputs"]]
+        )
+        placeholder = st.empty()
+        rendered    = []
+        for i, (_, label) in enumerate(check_items):
+            time.sleep(0.22)
+            rendered.append(label)
+            rows = "".join(
+                f'<div style="font-size:0.83rem;color:#1D4ED8;margin:3px 0">'
+                f'<span style="display:inline-block;width:18px;text-align:center">…</span> {lbl}</div>'
+                for lbl in rendered
+            )
+            placeholder.markdown(f'<div style="padding:4px 0">{rows}</div>', unsafe_allow_html=True)
+        placeholder.empty()
+        result = run_mission_checkpoint(mission_idx, st.session_state.get("lab_state", {}))
         st.session_state["checkpoint"] = {**cp, "phase": "result", **result}
         st.rerun()
 
     else:
+        # ── Result card ──────────────────────────────────────────────────────
         passed  = cp.get("passed", False)
         details = cp.get("details", [])
-        summary = cp.get("summary", "")
-        panel_cls = "checkpoint-panel" if passed else "checkpoint-panel fail"
-        title = "Mission checkpoint passed" if passed else "Checkpoint — some items incomplete"
-        st.markdown(f'<div class="{panel_cls}"><p class="checkpoint-title">{title}</p><p class="checkpoint-detail">{summary}</p></div>', unsafe_allow_html=True)
-        for ok, label in details:
-            icon = "✓" if ok else "✗"
-            col  = "#166534" if ok else "#B91C1C"
-            st.markdown(f'<span style="color:{col};font-size:0.83rem">{icon} {label}</span>', unsafe_allow_html=True)
+        state   = st.session_state.get("lab_state", {})
+
         if passed:
-            st.markdown("")
-            with st.expander("Create checkpoint commit (optional)"):
+            st.markdown(
+                f'<div class="checkpoint-panel">'
+                f'<p class="checkpoint-title">Mission checkpoint passed ✓</p>'
+                f'<p class="checkpoint-detail">{mission["goal"]}</p>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            n_fail = sum(1 for ok, _ in details if not ok)
+            st.markdown(
+                f'<div class="checkpoint-panel fail">'
+                f'<p class="checkpoint-title">Checkpoint — {n_fail} item(s) not yet complete</p>'
+                f'<p class="checkpoint-detail">Complete the remaining stages and run the prompt again.</p>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # Item checklist
+        rows_html = "".join(
+            f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.82rem;color:{"#166534" if ok else "#94A3B8"}">'
+            f'<span style="width:16px;text-align:center;font-weight:700">{"✓" if ok else "○"}</span>'
+            f'<span>{label}</span></div>'
+            for ok, label in details
+        )
+        st.markdown(f'<div style="margin:10px 0 14px 0">{rows_html}</div>', unsafe_allow_html=True)
+
+        if passed:
+            # ── Prompt principle recap ───────────────────────────────────────
+            pp = mission.get("prompt_principle")
+            tk = mission.get("takeaway")
+            if pp:
+                st.markdown(
+                    f'<div class="prompt-principle-callout" style="margin-bottom:14px">'
+                    f'<p class="prompt-principle-label">Prompt principle for this mission</p>'
+                    f'<p class="prompt-principle-name">{pp}</p>'
+                    + (f'<p class="prompt-principle-body">{tk}</p>' if tk else "")
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+
+            # ── What was accomplished ────────────────────────────────────────
+            bonus_prompt = mission.get("bonus_prompt")
+            if bonus_prompt:
+                with st.expander("Bonus challenge — go deeper", expanded=False):
+                    st.markdown(f'*{bonus_prompt}*')
+
+            # ── Next mission teaser ──────────────────────────────────────────
+            next_idx = mission_idx + 1
+            if next_idx < len(MISSIONS):
+                next_m = MISSIONS[next_idx]
+                st.markdown(
+                    f'<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;'
+                    f'padding:14px 18px;margin-bottom:16px">'
+                    f'<p style="font-size:0.70rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748B;margin:0 0 4px 0">Up next</p>'
+                    f'<p style="font-size:0.92rem;font-weight:600;color:#1E40AF;margin:0 0 4px 0">{next_m["label"]}</p>'
+                    f'<p style="font-size:0.82rem;color:#475569;margin:0">{next_m["goal"]}</p>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            # ── CTAs ─────────────────────────────────────────────────────────
+            cta_l, cta_r = st.columns(2)
+            with cta_l:
+                if st.button(
+                    f"Go to Mission {next_idx}  →" if next_idx < len(MISSIONS) else "View all results  →",
+                    key="btn_cp_next", type="primary", use_container_width=True,
+                ):
+                    st.session_state["checkpoint"]        = None
+                    st.session_state["viewing_mission_idx"] = None
+                    st.rerun()
+            with cta_r:
+                if st.button("View reflection prompt", key="btn_cp_reflect", use_container_width=True):
+                    st.session_state["checkpoint"] = None
+                    # Reflection is in cockpit center for this mission — just close and show cockpit
+                    st.session_state["viewing_mission_idx"] = mission_idx
+                    st.rerun()
+
+            # ── Git checkpoint ────────────────────────────────────────────────
+            with st.expander("Create checkpoint commit (optional)", expanded=False):
+                st.caption("Saves your current artifacts to git history.")
                 if st.button("Create git checkpoint commit", key="btn_git_cp"):
-                    ok, msg = attempt_git_checkpoint(MISSIONS[cp["mission_idx"]]["label"])
-                    if ok:
-                        st.success(msg)
+                    git_ok, git_msg = attempt_git_checkpoint(mission["label"])
+                    if git_ok:
+                        st.success(git_msg)
                     else:
-                        st.warning(msg)
-        if st.button("Close checkpoint", key="btn_close_cp"):
-            st.session_state["checkpoint"] = None
-            st.rerun()
+                        st.warning(git_msg)
+        else:
+            if st.button("Close and keep working", key="btn_close_cp", use_container_width=True):
+                st.session_state["checkpoint"] = None
+                st.rerun()
 
 
 def render_session_archive_section() -> None:
@@ -1290,20 +1692,20 @@ def render_sidebar_rail(state: dict) -> None:
         is_last = (i == len(MISSIONS) - 1)
 
         if disp == "complete":
-            dot_bg, dot_bd, dot_fg = "#14532D", "#166534", "#4ADE80"
-            line_col, text_col     = "#1A3B28", "#6EE7B7"
+            dot_bg, dot_bd, dot_fg = "#DCFCE7", "#86EFAC", "#15803D"
+            line_col, text_col     = "#86EFAC", "#166534"
             icon = "&#10003;"
         elif disp == "current":
-            dot_bg, dot_bd, dot_fg = "#1E3A8A", "#2563EB", "#93C5FD"
-            line_col, text_col     = "#1E3058", "#BFDBFE"
+            dot_bg, dot_bd, dot_fg = "#DBEAFE", "#93C5FD", "#1D4ED8"
+            line_col, text_col     = "#BFDBFE", "#1E40AF"
             icon = str(i)
         elif disp == "unlocked":
-            dot_bg, dot_bd, dot_fg = "#1E293B", "#334155", "#64748B"
-            line_col, text_col     = "#1E293B", "#475569"
+            dot_bg, dot_bd, dot_fg = "#F1F5F9", "#E2E8F0", "#64748B"
+            line_col, text_col     = "#E2E8F0", "#475569"
             icon = str(i)
         else:
-            dot_bg, dot_bd, dot_fg = "#0F172A", "#1E293B", "#334155"
-            line_col, text_col     = "#0F172A", "#334155"
+            dot_bg, dot_bd, dot_fg = "#F8FAFC", "#E2E8F0", "#CBD5E1"
+            line_col, text_col     = "#E2E8F0", "#94A3B8"
             icon = str(i)
 
         fw = "font-weight:600;" if disp == "current" else ""
@@ -1383,13 +1785,14 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
     """Center panel: mission header + one-step prompt + run checklist + Layer B."""
 
     # ── Mission header ─────────────────────────────────────────────────────
+    # id="tut-target-mission-header" is measured by the tutorial JS
     parts   = mission["label"].split("—")
     m_num   = parts[0].strip()
     m_title = parts[1].strip() if len(parts) > 1 else mission["label"]
     m_digit = m_num.replace("Mission ", "").strip()
 
     st.markdown(
-        f'<div class="cockpit-mission-header">'
+        f'<div id="tut-target-mission-header" class="cockpit-mission-header">'
         f'<div class="cockpit-mission-eyebrow">Current Mission</div>'
         f'<div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px 0">'
         f'<div class="mission-num-badge">{m_digit}</div>'
@@ -1424,8 +1827,9 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
             unsafe_allow_html=True,
         )
 
+    # id on the label marks the top of the prompt block for the tutorial JS
     st.markdown(
-        f'<div class="prompt-copy-label">Copy this into Claude Code</div>'
+        f'<div id="tut-target-prompt-block" class="prompt-copy-label">Copy this into Claude Code</div>'
         f'<div class="prompt-file-tag">{pfile}</div>',
         unsafe_allow_html=True,
     )
@@ -1482,9 +1886,10 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
     # Use mission_stages_complete for real-time check (doesn't require state refresh)
     mission_done = mission_stages_complete(cur_idx) or (cur_idx in state["completed_missions"])
 
+    # id="tut-target-reflection" on the lock/unlock div — measured by tutorial JS
     if not mission_done:
         st.markdown(
-            '<div class="layer-b-lock">'
+            '<div id="tut-target-reflection" class="layer-b-lock">'
             '<div class="layer-b-lock-icon">🔒</div>'
             '<div class="layer-b-lock-title">Reflection prompt locked</div>'
             '<div class="layer-b-lock-hint">Complete all stages for this mission to unlock the reflection prompt.</div>'
@@ -1492,7 +1897,7 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
             unsafe_allow_html=True,
         )
     else:
-        st.markdown('<div class="layer-b-open-label">Layer B — Reflection prompt</div>', unsafe_allow_html=True)
+        st.markdown('<div id="tut-target-reflection" class="layer-b-open-label">Layer B — Reflection prompt</div>', unsafe_allow_html=True)
         for pf in mission["prompts"]:
             c = prompt_text(pf)
             if c:
@@ -1521,6 +1926,18 @@ def render_cockpit_center(mission: dict, cur_idx: int, state: dict) -> None:
         with st.expander("Layer C — Customization (optional extension)", expanded=False):
             for c_text in all_c:
                 st.markdown(c_text)
+
+    # ── Bonus challenge (collapsed) ─────────────────────────────────────────
+    bonus = mission.get("bonus_prompt")
+    if bonus:
+        with st.expander("Bonus challenge — go deeper", expanded=False):
+            st.markdown(
+                f'<div class="bonus-callout">'
+                f'<p class="bonus-label">Bonus</p>'
+                f'<p class="bonus-body">{bonus}</p>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 
 def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> None:
@@ -1552,9 +1969,10 @@ def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> 
         )
 
     # ── Artifact preview ─────────────────────────────────────────────────────
+    # id="tut-target-artifacts" marks the section label for the tutorial JS
     art_col, ref_col = st.columns([3, 1])
     with art_col:
-        st.markdown('<div class="artifact-panel-label">Artifacts</div>', unsafe_allow_html=True)
+        st.markdown('<div id="tut-target-artifacts" class="artifact-panel-label">Artifacts</div>', unsafe_allow_html=True)
     with ref_col:
         if st.button("⟳ Refresh", key="btn_artifact_refresh", help="Re-scan outputs for new artifacts"):
             st.rerun()
@@ -1624,7 +2042,8 @@ def render_cockpit_right(cur_idx: int, state: dict, result_code: str | None) -> 
     st.divider()
 
     # ── Stage status ─────────────────────────────────────────────────────────
-    st.markdown('<div class="artifact-panel-label">Stage status</div>', unsafe_allow_html=True)
+    # id="tut-target-stage-status" marks this section for the tutorial JS
+    st.markdown('<div id="tut-target-stage-status" class="artifact-panel-label">Stage status</div>', unsafe_allow_html=True)
     for s in mission["stages"]:
         ok    = stage_ok(s)
         color = "#15803D" if ok else "#94A3B8"
@@ -1681,12 +2100,12 @@ with st.sidebar:
     pct = int(n_complete / n_total * 100)
     st.markdown(
         f'<div style="padding:8px 0 14px 0">'
-        f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.20em;text-transform:uppercase;color:#4A6A8A;margin-bottom:4px">Medical AI Lab</div>'
-        f'<div style="font-size:0.95rem;font-weight:700;color:#B0CCE8;margin-bottom:16px;letter-spacing:-0.01em">Mission Console</div>'
-        f'<div style="background:#1E293B;border-radius:4px;height:5px;margin-bottom:8px;overflow:hidden">'
+        f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.20em;text-transform:uppercase;color:#64748B;margin-bottom:4px">Medical AI Lab</div>'
+        f'<div style="font-size:0.95rem;font-weight:700;color:#1E40AF;margin-bottom:16px;letter-spacing:-0.01em">Mission Console</div>'
+        f'<div style="background:#D6DFEA;border-radius:4px;height:5px;margin-bottom:8px;overflow:hidden">'
         f'<div style="background:linear-gradient(90deg,#1E40AF,#3B82F6);height:100%;width:{pct}%;border-radius:4px;transition:width 0.5s ease"></div>'
         f'</div>'
-        f'<div style="font-size:0.74rem;color:#4A7A9A;font-weight:500">{n_complete} of {n_total} missions complete</div>'
+        f'<div style="font-size:0.74rem;color:#475569;font-weight:500">{n_complete} of {n_total} missions complete</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -1695,7 +2114,7 @@ with st.sidebar:
         try:
             ts = datetime.fromisoformat(state["last_checked"])
             st.markdown(
-                f'<div style="font-size:0.68rem;color:#334455;margin-bottom:10px">Last checked {ts.strftime("%Y-%m-%d %H:%M")} UTC</div>',
+                f'<div style="font-size:0.68rem;color:#64748B;margin-bottom:10px">Last checked {ts.strftime("%Y-%m-%d %H:%M")} UTC</div>',
                 unsafe_allow_html=True,
             )
         except Exception:
@@ -1704,9 +2123,12 @@ with st.sidebar:
     st.divider()
 
     # ── PRIMARY ACTION — used after every mission ─────────────────────────────
+    # id="tut-target-sidebar-button" is measured by the tutorial JS for spotlight
     st.markdown(
-        '<div style="font-size:0.68rem;color:#4A7A9A;margin-bottom:6px;line-height:1.45">'
-        'After finishing a mission in VS Code + Claude Code, click here to record your progress.</div>',
+        '<div id="tut-target-sidebar-button">'
+        '<div style="font-size:0.68rem;color:#475569;margin-bottom:6px;line-height:1.45">'
+        'After finishing a mission in VS Code + Claude Code, click here to record your progress.</div>'
+        '</div>',
         unsafe_allow_html=True,
     )
     if st.button("✓  I finished — check my progress", use_container_width=True, type="primary"):
@@ -1720,15 +2142,15 @@ with st.sidebar:
     # ── ADVANCED TOOLS (collapsed by default) ────────────────────────────────
     with st.expander("Advanced tools", expanded=False):
         st.markdown(
-            '<div style="font-size:0.74rem;color:#4A7A9A;margin-bottom:10px;line-height:1.5">'
+            '<div style="font-size:0.74rem;color:#475569;margin-bottom:10px;line-height:1.5">'
             'These tools are for recovery only. You do not need them for normal lab work.</div>',
             unsafe_allow_html=True,
         )
 
         # Rebuild
         st.markdown(
-            '<div style="font-size:0.72rem;color:#334455;font-weight:600;margin-bottom:3px">Rebuild progress from files on disk</div>'
-            '<div style="font-size:0.70rem;color:#334455;margin-bottom:6px;line-height:1.4">'
+            '<div style="font-size:0.72rem;color:#374151;font-weight:600;margin-bottom:3px">Rebuild progress from files on disk</div>'
+            '<div style="font-size:0.70rem;color:#475569;margin-bottom:6px;line-height:1.4">'
             'Use if the dashboard lost track of which missions you completed.</div>',
             unsafe_allow_html=True,
         )
@@ -1781,7 +2203,7 @@ with st.sidebar:
 
     # ── Mission rail ──────────────────────────────────────────────────────────
     st.markdown(
-        '<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#2A4060;margin-bottom:10px">Missions</div>',
+        '<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#64748B;margin-bottom:10px">Missions</div>',
         unsafe_allow_html=True,
     )
     render_sidebar_rail(st.session_state["lab_state"])
@@ -1905,6 +2327,18 @@ with tab_cockpit:
         if show_welcome:
             render_welcome_screen()
 
+        # ── Tutorial — auto-starts when entering lab for the first time ───────
+        elif (
+            st.session_state.get("entered_lab", False)
+            and st.session_state.get("tutorial_step") is None
+            and cur_idx == 0
+            and len(state["completed_missions"]) == 0
+            and view_idx_override is None
+        ):
+            # Auto-start tutorial on first lab entry
+            st.session_state["tutorial_step"] = 0
+            st.rerun()
+
         # ── All-done banner ───────────────────────────────────────────────────
         elif all_done and mission_stages_complete(cur_idx) and view_idx_override is None:
             st.markdown(
@@ -1916,8 +2350,16 @@ with tab_cockpit:
                 unsafe_allow_html=True,
             )
 
+        tutorial_step_val = st.session_state.get("tutorial_step")
+
         # ── Cockpit (2-column) ────────────────────────────────────────────────
         if not show_welcome:
+            # ── Tutorial card — rendered at TOP so always visible ─────────────
+            # Native st.button() controls mutate session state directly.
+            # JS component below only handles CSS focus classes + scrollIntoView.
+            if isinstance(tutorial_step_val, int) and not in_checkpoint:
+                render_tutorial_nav(tutorial_step_val)
+
             col_center, col_right = st.columns([0.63, 0.37])
 
             with col_center:
@@ -1937,13 +2379,20 @@ with tab_cockpit:
 with tab_map:
     state = st.session_state["lab_state"]
 
-    st.markdown(
-        '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
-        'Mission Map</div>'
-        '<div style="font-size:0.88rem;color:#64748B;margin-bottom:18px">'
-        'Complete missions in order — each unlocks the next.</div>',
-        unsafe_allow_html=True,
-    )
+    hdr_col, restart_col = st.columns([0.75, 0.25])
+    with hdr_col:
+        st.markdown(
+            '<div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+            'Mission Map</div>'
+            '<div style="font-size:0.88rem;color:#64748B;margin-bottom:18px">'
+            'Complete missions in order — each unlocks the next.</div>',
+            unsafe_allow_html=True,
+        )
+    with restart_col:
+        st.write("")
+        if st.button("↺ Restart tutorial", key="btn_restart_tutorial", help="Restart the Mission 0 guided tutorial"):
+            st.session_state["tutorial_step"] = 0
+            st.rerun()
 
     for i, m in enumerate(MISSIONS):
         disp      = get_mission_display_status(i, state)

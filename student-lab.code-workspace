@@ -1,0 +1,63 @@
+{
+  "folders": [
+    {
+      "name": "Medical AI Lab",
+      "path": "."
+    }
+  ],
+  "settings": {
+    // ── Student-facing view ────────────────────────────────────────────────────
+    // This workspace is the recommended way to open the repo in VS Code.
+    // It shows only what students need: prompts, outputs, reports, and the
+    // three orientation documents (README, ASSIGNMENT, CLAUDE.md).
+    // All support scaffold is hidden from the Explorer but still works normally.
+
+    "files.exclude": {
+      // Support infrastructure — hidden but fully functional
+      ".coursekit/":         true,
+      ".devcontainer/":      true,
+      ".github/":            true,
+      ".pytest_cache/":      true,
+      ".session_archives/":  true,
+      ".student_state/":     true,
+      ".venv/":              true,
+      ".vscode/":            true,
+      "app/":                true,
+      "artifacts/":          true,
+
+      // Scaffold students work in via Claude, not by browsing
+      "scripts/":            true,
+      "tests/":              true,
+      "data/":               true,
+
+      // One-time setup / pipeline files — not pedagogically relevant day-to-day
+      "Makefile":            true,
+      "requirements.txt":    true,
+      "requirements.lock":   true,
+      ".gitignore":          true
+    },
+
+    "search.exclude": {
+      ".coursekit/":         true,
+      ".devcontainer/":      true,
+      ".github/":            true,
+      ".pytest_cache/":      true,
+      ".session_archives/":  true,
+      ".student_state/":     true,
+      ".venv/":              true,
+      "app/":                true,
+      "artifacts/":          true,
+      "scripts/":            true,
+      "tests/":              true,
+      "data/":               true
+    },
+
+    // Keep Explorer clean and focused
+    "explorer.compactFolders": false,
+    "explorer.sortOrder": "default",
+
+    // Suppress noisy status-bar features not relevant to students
+    "git.decorations.enabled": true,
+    "editor.minimap.enabled": false
+  }
+}

@@ -1,94 +1,109 @@
-# Stage 08 — Adapt Pipeline (Day 2 Challenge)
-## Mission 5: Implement and Measure
+# Mission 5 — Design the Next Study (Part 2): Implement and Measure
 
-## Goal
+## What this mission is about
 
-Implement the adaptation described in `reports/challenge_plan.md`:
-per-slice Otsu adaptive thresholding combined with the largest-CC post-processing step
-from Day 1. Measure the result against the Day 1 baseline with the same metric.
+Now you execute the plan. The goal is to implement the proposed change from
+`reports/challenge_plan.md` and measure the outcome honestly against the
+Day 1 baseline. The plan you wrote before is the test: did the experiment
+match the intent?
 
-The key scientific question is whether your Day 2 hypothesis holds up under measurement.
-A negative result reported honestly is as valuable as a positive one.
+---
 
-## The Day 2 change
+## Prompt Principle: Ask for comparison, not just generation
 
-**Per-slice Otsu thresholding:** for each slice, compute the threshold that maximises
-inter-class variance between background and foreground intensity modes
-(`skimage.filters.threshold_otsu`), then apply it as the binary decision boundary.
-The largest-CC step from Day 1 is applied to both the baseline and the Day 2 predictions
-to ensure a fair comparison.
+A prompt that says "implement the change and measure it" produces a number.
+A prompt that says "compare against the baseline using the same metric, same
+data split, and same evaluation protocol — and explain any deviation from
+the plan" produces a scientific result. The comparison instruction is not
+optional.
 
-## Layer A — Base prompt
+---
 
-> "Run `make adapt-pipeline`. Then open `reports/adapt_pipeline.md` and look at
-> `outputs/figures/challenge_comparison.png`. Explain:
-> - what Otsu's method does differently from the fixed threshold used in Day 1
-> - what the per-slice threshold statistics (mean ± std) tell us about this dataset's
->   intensity variability across slices
-> - whether the Day 2 adaptation improved, degraded, or left Dice unchanged
-> - whether the outcome is consistent with the plan we wrote in Stage 07
-> - what that outcome tells us about the intensity distribution assumptions in this pack"
+## Layer A — Base Prompt
 
-## What this stage produces
+> I need to implement the Day 2 study plan from `reports/challenge_plan.md`
+> and measure whether it achieved what was planned.
+>
+> Please do the following:
+>
+> 1. Read `reports/challenge_plan.md`. Summarize the proposed change and the
+>    success criterion I set before running the experiment.
+>
+> 2. Implement the proposed change in `scripts/adapt_pipeline.py`.
+>    - Use the same random seed (42) as the baseline
+>    - Use the same validation split
+>    - Compute Dice on the same metric as before
+>
+> 3. Run the evaluation and report:
+>    - The Day 1 baseline Dice (from `outputs/metrics/val_metrics.json`)
+>    - The Day 2 result Dice
+>    - The delta (improvement or regression)
+>    - Whether the pre-specified success criterion was met
+>
+> 4. Save a comparison figure to `outputs/figures/challenge_comparison.png`.
+>
+> 5. Write comparison metrics to `outputs/metrics/challenge_comparison.json`:
+>    `{"baseline_dice": X, "new_dice": Y, "delta": Z, "change_description": "..."}`
+>
+> 6. Write an adaptation report to `reports/adapt_pipeline.md` with:
+>    - What was implemented (brief description)
+>    - The numerical result
+>    - Whether the pre-specified success criterion was met (yes/no/partially)
+>    - If the result differs from the plan, explain why
+>
+> 7. Write a status file to `outputs/status/stage_08_adapt_pipeline.json`:
+>    `{"status": "ok", "changes_summary": "...", "baseline_dice": X, "new_dice": Y, "delta": Z}`
+>
+> Do not revise the success criterion retroactively. If it was not met, say so.
 
-| Artifact | Description |
-|---|---|
-| `outputs/figures/challenge_comparison.png` | 4-panel: GT / fixed threshold / Otsu / bar chart |
-| `outputs/metrics/challenge_comparison.json` | `baseline_dice`, `new_dice`, `delta`, `change_description`, `otsu_thresholds_per_slice` |
-| `reports/adapt_pipeline.md` | Written comparison with interpretation and scientific takeaway |
-| `outputs/status/stage_08_adapt_pipeline.json` | `{"status":"ok","changes_summary":"...","baseline_dice":…,"new_dice":…,"delta":…}` |
+---
 
-## Files
+## Required outputs
 
-**Allowed to edit:** `scripts/adapt_pipeline.py`, `reports/adapt_pipeline.md`
+| File | Minimum content |
+|------|-----------------|
+| `outputs/figures/challenge_comparison.png` | Before/after Day 1 vs Day 2 comparison figure |
+| `outputs/metrics/challenge_comparison.json` | `{"baseline_dice": X, "new_dice": Y, "delta": Z, "change_description": "..."}` |
+| `reports/adapt_pipeline.md` | Implementation description, result, plan vs outcome assessment |
+| `outputs/status/stage_08_adapt_pipeline.json` | `{"status": "ok", "changes_summary": "...", "baseline_dice": X, "new_dice": Y, "delta": Z}` |
 
-**Protected — do not modify:** `outputs/metrics/challenge_comparison.json` (written by the script),
-`reports/challenge_plan.md` (written in Stage 07 — do not retroactively change the plan),
-`tests/`, `artifacts/schema.json`, `prompts/`
+---
 
-## Check
+## Layer B — Reflection Prompt
 
-```bash
-make adapt-pipeline
-# Prints: baseline Dice, new Dice, direction (↑ improved / ↓ degraded / → unchanged)
-# Prints: Otsu threshold statistics (mean ± std across slices)
-```
+> Compare `reports/challenge_plan.md` (the plan) with `reports/adapt_pipeline.md` (the outcome).
+>
+> Answer these questions as if writing a **methods section and results discussion** for a paper:
+>
+> - Was the implementation faithful to the plan? What changed and why?
+> - Was the success criterion met? If partially, what was achieved and what was not?
+> - What does this result tell you about the original hypothesis from Mission 3?
+> - If the result was negative: does that mean the hypothesis was wrong, or that the
+>   implementation did not adequately test it?
+> - What would you report to a co-author who invested in this direction?
 
-**What to inspect manually:**
-- Open `outputs/figures/challenge_comparison.png` — does the Otsu prediction look visually different?
-  Does it look more or less accurate than the fixed-threshold prediction?
-- Check `outputs/metrics/challenge_comparison.json` — does the `delta` match the direction
-  shown in the bar chart?
-- Compare the actual outcome to the prediction in `reports/challenge_plan.md` — did the experiment confirm or refute the plan?
+---
 
-## Layer B — Reflection prompt
+## Layer C — Exploration Challenge
 
-After reviewing the result, ask Claude:
+> Investigate the result more deeply by running a sensitivity analysis:
+>
+> - Try two small variations on the Day 2 implementation (e.g., different threshold,
+>   different preprocessing step, different number of training iterations).
+> - Save results to `outputs/metrics/day2_sensitivity.json` as a list of
+>   `[{"variation": "...", "dice": X}, ...]`.
+> - In `reports/adapt_pipeline.md`, add a `## Sensitivity Analysis` section
+>   discussing how stable the result is.
+>
+> *Why this matters: a single result can be a lucky seed. Sensitivity analysis
+> tests whether the conclusion holds across small variations.*
 
-> "Compare the Day 2 outcome to the Stage 07 plan:
-> - Did Otsu's method generalise better across slices with different intensity distributions,
->   as the plan predicted? What does the per-slice threshold variation tell you?
-> - If the result degraded, does that refute the hypothesis that intensity variability
->   was the problem — or does it suggest a different problem?
-> - Add a section called '## Comparison to plan' to `reports/adapt_pipeline.md`
->   that states: (a) what the plan predicted, (b) what actually happened, and (c) what you conclude."
-
-## Layer C — What you can customize
-
-Ask Claude: "What would the comparison look like if we evaluated both pipelines *without*
-the CC post-processing step?" This isolates the effect of Otsu alone, separate from the CC
-effect. It does not require changing any committed outputs — just ask Claude to reason through it analytically.
+---
 
 ## Discussion questions
 
-- Did Otsu's method generalise better across slices? What does the variance in per-slice
-  thresholds tell you about the intensity distribution of this dataset?
-- If the bimodal-histogram assumption fails on some slices, should you report the aggregate
-  Dice or a per-slice breakdown? What is more scientifically honest?
-- Both pipelines use the CC post-processing step. How would the comparison look if you
-  also evaluated without CC filtering? Does the CC step mask the effect of the threshold change?
-
-## What comes next
-
-Stage 09 assembles the final clinical translation memo using all Day 1 and Day 2 results.
-This is the capstone artifact of the lab.
+- Why does the prompt say "do not revise the success criterion retroactively"?
+  What is the risk of changing the goalposts after seeing the result?
+- What does it mean if the adaptation improved Dice but did not meet the
+  pre-specified success criterion?
+- How would you report a negative result in a way that is still scientifically useful?

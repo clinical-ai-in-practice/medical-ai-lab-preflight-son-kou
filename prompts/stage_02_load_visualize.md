@@ -1,81 +1,91 @@
-# Stage 02 — Load & Visualize
-## Mission 1: First Look at the Data
+# Mission 2 — Build the First Detector (Part 1): Inspect the Data
 
-## Goal
+## What this mission is about
 
-Load the teaching dataset and produce a labeled overlay figure — the first visual artifact
-of the lab. More importantly, use this figure to make your first evidence-based observation
-about the data: what does the anatomy look like, how clear is the boundary between target
-and background, and what challenges does the image quality suggest for segmentation?
+Visualization is not decoration — it is the first act of scientific investigation.
+Before training any model, you need to see the data: what the anatomy looks like,
+how clean the ground-truth mask boundary is, and what challenges the image quality
+presents for a segmentation algorithm.
 
-Visualization is not decoration. It is the first act of scientific investigation.
+---
 
-## Layer A — Base prompt
+## Prompt Principle: Inspect before you act
 
-> "Run `make visualize`. Then open `outputs/figures/sample_overlay.png` and
-> `reports/data_notes.md`. Explain to me in plain language:
-> - what the image shows (anatomy, modality, approximate resolution)
-> - how the ground-truth mask was drawn — does it look clean or noisy at the boundary?
-> - what the most difficult aspect of this dataset looks like for a segmentation algorithm
-> - whether there is anything surprising or unusual about this particular sample"
+Asking Claude to analyze and describe an artifact *before* taking action grounds
+its subsequent work in evidence. A prompt that says "visualize, then interpret"
+produces a more useful artifact than one that says "visualize." The interpretation
+is as important as the figure.
 
-## What this stage produces
+---
 
-| Artifact | Description |
-|---|---|
-| `outputs/figures/sample_overlay.png` | Overlay figure: image with ground-truth mask contour |
-| `reports/data_notes.md` | Written data description: modality, anatomy, boundary quality, initial observations |
-| `outputs/status/stage_02_load_visualize.json` | `{"status":"ok","figure":"sample_overlay.png"}` |
+## Layer A — Base Prompt
 
-## Files
+> I have a medical imaging dataset in `data/sample/`. I need to visualize it
+> and record my first scientific observations.
+>
+> Please do the following:
+>
+> 1. Load the sample image and mask from `data/sample/`.
+>    Show me their shapes, data types, and value ranges before doing anything else.
+>
+> 2. Create a visualization that overlays the ground-truth mask contour on the image.
+>    Save it to `outputs/figures/sample_overlay.png`.
+>    The figure should be clear enough that I can see both the anatomy and the mask boundary.
+>
+> 3. After creating the figure, tell me in plain language:
+>    - What the image shows (anatomy, imaging modality, approximate resolution)
+>    - How clean or noisy the mask boundary looks
+>    - What looks most challenging about this dataset for a segmentation algorithm
+>    - Anything surprising or unusual
+>
+> 4. Write these observations to `reports/data_notes.md` with a "## Data Observations" section.
+>
+> 5. Write a status file to `outputs/status/stage_02_load_visualize.json` with:
+>    `{"status": "ok", "figure": "sample_overlay.png"}`
 
-**Allowed to edit:** `scripts/visualize_sample.py`, `reports/data_notes.md`
+---
 
-**Protected — do not modify:** `data/sample/`, `tests/`, `artifacts/schema.json`, `prompts/`
+## Required outputs
 
-## Check
+| File | Minimum content |
+|------|-----------------|
+| `outputs/figures/sample_overlay.png` | Image with mask overlay, non-empty |
+| `reports/data_notes.md` | Written observations: modality, anatomy, boundary quality, challenges |
+| `outputs/status/stage_02_load_visualize.json` | `{"status": "ok", "figure": "sample_overlay.png"}` |
 
-```bash
-make visualize
-# Expected: prints path to saved figure without error
-# Then verify:
-ls -lh outputs/figures/sample_overlay.png   # should be non-empty
-cat reports/data_notes.md
-```
+---
 
-**What to inspect manually:**
-- Open `outputs/figures/sample_overlay.png` — can you clearly see the image and the mask overlay?
-- Read `reports/data_notes.md` — does it reflect what you actually see in the figure?
-  If the report says the boundary is "clean" but the figure shows jagged edges, that is a problem.
+## Layer B — Reflection Prompt
 
-## Layer B — Reflection prompt
+> Look at `outputs/figures/sample_overlay.png` and the notes in `reports/data_notes.md`.
+>
+> Put yourself in the role of a **skeptical peer reviewer** evaluating this dataset:
+> - Would you trust this ground-truth mask for training? What evidence supports or undermines that trust?
+> - What annotation artifacts or biases might be present?
+> - If you were designing a segmentation algorithm for this data, what is your biggest concern?
+> - What additional data or metadata would you want before proceeding to model training?
 
-After reviewing the figure and the report, ask Claude:
+---
 
-> "Based on what you can see in the overlay figure and the data_notes report:
-> - What threshold strategy would you expect to work best on this data and why?
-> - What failure mode would you predict for a simple intensity threshold on this dataset?
-> - If you had to describe this dataset to a radiologist, what would you say?
-> Write your answers as an addition to `reports/data_notes.md` under a heading called
-> '## Initial Hypothesis'."
+## Layer C — Exploration Challenge
 
-## Layer C — What you can customize
+> Extend the visualization to give a more complete picture:
+>
+> - Create a second figure showing at least 3 different image slices side by side
+>   (if the dataset has multiple slices), each with its mask overlay.
+>   Save it to `outputs/figures/multi_slice_overview.png`.
+> - For each slice, note its mask foreground fraction. Does coverage vary across slices?
+>
+> Update `reports/data_notes.md` with this multi-slice characterization.
+>
+> *Why this matters: a single-slice visualization can be unrepresentative.
+> Variation across slices reveals dataset heterogeneity.*
 
-Ask Claude to show you a different slice from the teaching pack — either the first slice,
-the middle slice, or a slice you choose. Does the anatomy look consistent across slices?
-This is a good early sanity check before committing to the full pipeline.
+---
 
 ## Discussion questions
 
-- Does the ground-truth mask boundary look hand-drawn or algorithmically generated?
-  Why does this matter for how you interpret your Dice score later?
-- If the image has poor contrast between target and background, what does that predict
-  about the baseline model's performance in Stage 03?
-- What is the difference between a good visualization and a useful one?
-  Is `sample_overlay.png` useful for making a scientific decision?
-
-## What comes next
-
-Stage 03 trains the first baseline model on this dataset and produces the first
-quantitative metric. The observations you made here will directly motivate how
-you interpret that metric in Stage 03.
+- Why does the prompt ask Claude to report shapes and value ranges *before* creating the figure?
+- What is the difference between a "clean" and a "noisy" mask boundary for model training?
+- If `sample_overlay.png` is created but `data_notes.md` is empty or trivial,
+  has this mission succeeded? Why or why not?
